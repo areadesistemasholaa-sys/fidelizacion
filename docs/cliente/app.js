@@ -7,17 +7,13 @@
 
 import { auth, db } from "/shared/firebase-config.js";
 import {
-  sendSignInLinkToEmail,
-  isSignInWithEmailLink,
-  signInWithEmailLink,
+  signInAnonymously,
   onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   collection, query, where, limit, getDocs, orderBy, doc, getDoc,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { enviarEncuesta as opEnviarEncuesta } from "/shared/firestore-ops.js";
-
-const LS_EMAIL_ENLACE = "holaa_cliente_email_enlace";
 
 const app = document.getElementById("app");
 
@@ -57,28 +53,19 @@ async function init() {
   aplicarTema(campana.tema);
   estado.preguntas = await cargarPreguntas(campana.campanaId);
 
-  // Sección 11/18 — Acceso por "enlace seguro" al correo (sin SMS, sin
-  // Blaze). Si esta carga de página viene de dar clic en ese enlace,
-  // completamos el inicio de sesión aquí mismo y saltamos directo a
-  // la encuesta; si no, mostramos la bienvenida normal.
-  if (isSignInWithEmailLink(auth, window.location.href)) {
-    let email = window.localStorage.getItem(LS_EMAIL_ENLACE);
-    if (!email) {
-      email = window.prompt("Confirma tu correo para continuar:");
-    }
-    try {
-      await signInWithEmailLink(auth, email, window.location.href);
-      window.localStorage.removeItem(LS_EMAIL_ENLACE);
-      estado.datosCliente.email = email;
-      window.history.replaceState({}, document.title, window.location.pathname);
-      renderPaso();
-      return;
-    } catch {
-      // Enlace inválido/expirado: seguimos al flujo normal de acceso.
-    }
-  }
-
   renderBienvenida();
+}
+
+// -------------------------------------------------------------------
+// Identidad del cliente — sesión anónima (igual que Panel Caja). No
+// se le pide correo ni cuenta de ningún tipo; el uid anónimo de
+// Firebase Auth es lo único que usan firestore.rules para saber que
+// "una respuesta le pertenece a quien la envió".
+// -------------------------------------------------------------------
+async function asegurarSesion() {
+  if (auth.currentUser) return auth.currentUser;
+  const cred = await signInAnonymously(auth);
+  return cred.user;
 }
 
 async function cargarCampanaActiva() {
@@ -140,62 +127,19 @@ function renderBienvenida() {
       <p class="subtexto">${escapeHtml(c.mensajeBienvenida || c.descripcion || "Queremos conocerte mejor. Responde nuestra encuesta y recibe un beneficio especial.")}</p>
       <button class="btn btn-primario" id="btn-empezar">Comenzar</button>
     </div>`;
-  document.getElementById("btn-empezar").onclick = () => renderAcceso();
-}
-
-// -------------------------------------------------------------------
-// Sección 11/18 — Acceso del cliente vía "enlace seguro" al correo
-// (Firebase Auth email-link). Reemplaza al SMS/OTP: el SMS nunca ha
-// sido gratis en Firebase (se cobra por mensaje) y esta app corre en
-// el plan Spark, sin tarjeta (Sección 34). El teléfono sigue
-// preguntándose más adelante como dato de contacto, solo que ya no
-// se verifica por mensaje de texto.
-// -------------------------------------------------------------------
-function renderAcceso() {
-  app.innerHTML = `
-    <div class="pantalla">
-      <h1 class="pregunta-texto">¿Cuál es tu correo electrónico?</h1>
-      <p class="subtexto" style="margin-bottom:1rem">Te enviaremos un enlace para confirmar que eres tú. Así evitamos duplicar tu perfil.</p>
-      <input type="email" id="input-email-acceso" placeholder="tucorreo@ejemplo.com" autocomplete="email" />
-      <div id="error-email-acceso" class="error-texto" hidden></div>
-      <div class="nav-inferior" style="padding:0">
-        <button class="btn btn-primario" id="btn-enviar-enlace">Enviar enlace</button>
-      </div>
-    </div>`;
-
-  document.getElementById("btn-enviar-enlace").onclick = async () => {
-    const input = document.getElementById("input-email-acceso");
-    const errorEl = document.getElementById("error-email-acceso");
-    const email = input.value.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errorEl.textContent = "Ingresa un correo válido.";
-      errorEl.hidden = false;
-      return;
-    }
-    errorEl.hidden = true;
-    estado.datosCliente.email = email;
-
+  document.getElementById("btn-empezar").onclick = async () => {
+    const boton = document.getElementById("btn-empezar");
+    boton.disabled = true;
+    boton.textContent = "Un momento…";
     try {
-      await sendSignInLinkToEmail(auth, email, {
-        url: window.location.href,
-        handleCodeInApp: true,
-      });
-      window.localStorage.setItem(LS_EMAIL_ENLACE, email);
-      renderEsperaEnlace(email);
+      await asegurarSesion();
+      renderPaso();
     } catch (e) {
-      errorEl.textContent = "No pudimos enviar el enlace. Intenta de nuevo en unos segundos.";
-      errorEl.hidden = false;
+      boton.disabled = false;
+      boton.textContent = "Comenzar";
+      window.alert("No pudimos iniciar tu sesión. Intenta de nuevo.");
     }
   };
-}
-
-function renderEsperaEnlace(email) {
-  app.innerHTML = `
-    <div class="pantalla centro">
-      <div class="icono-campana">✉️</div>
-      <h1 class="titulo-campana">Revisa tu correo</h1>
-      <p class="subtexto">Te enviamos un enlace a <strong>${escapeHtml(email)}</strong>. Ábrelo en este mismo dispositivo para continuar con la encuesta.</p>
-    </div>`;
 }
 
 // -------------------------------------------------------------------
