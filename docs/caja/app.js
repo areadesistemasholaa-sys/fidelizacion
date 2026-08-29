@@ -1,10 +1,9 @@
 // ===================================================================
 // HOLAA Trendy — Panel Caja (Sección 20)
 // Flujo: escanear -> ver resultado -> siguiente cliente.
-// Acepta lector físico de código de barras (actúa como teclado + Enter)
-// o la cámara del dispositivo (BarcodeDetector nativo, si el navegador
-// lo soporta). Sin acceso a clientes, campañas ni configuración más
-// allá de la sucursal del propio dispositivo (Sección 20.4).
+// Solo lector físico de código de barras (actúa como teclado + Enter).
+// Sin acceso a clientes, campañas ni configuración más allá de la
+// sucursal del propio dispositivo (Sección 20.4).
 // ===================================================================
 
 import { auth, db } from "/shared/firebase-config.js";
@@ -140,10 +139,8 @@ function renderPantallaEscaneo(dispositivoId, sucursalNombre) {
     </div>
     <div class="caja-centro">
       <div class="caja-icono-espera">🛒</div>
-      <div class="caja-instruccion">Escanea el código del cupón del cliente</div>
+      <div class="caja-instruccion">Usa el escáner para leer el código del cupón del cliente</div>
       <input type="text" id="input-scan" autofocus autocomplete="off" />
-      <button class="caja-boton-camara" id="btn-camara">📷 Usar la cámara</button>
-      <div id="lector-camara" hidden></div>
     </div>
     <div class="caja-historial" id="caja-historial"></div>`;
 
@@ -167,8 +164,6 @@ function renderPantallaEscaneo(dispositivoId, sucursalNombre) {
     }
   });
   inputScan.addEventListener("input", () => { buffer = inputScan.value; });
-
-  document.getElementById("btn-camara").onclick = () => iniciarCamara(dispositivoId, sucursalNombre);
 
   pintarHistorial(dispositivoId);
 }
@@ -223,34 +218,6 @@ function mantenerFoco(el) {
   el.focus();
   document.addEventListener("click", () => el.focus());
   window.addEventListener("focus", () => el.focus());
-}
-
-async function iniciarCamara(dispositivoId, sucursalNombre) {
-  const contCamara = document.getElementById("lector-camara");
-  if (!("BarcodeDetector" in window)) {
-    alert("Este navegador no soporta lectura de código de barras por cámara. Usa el lector físico o escríbelo manualmente.");
-    return;
-  }
-  contCamara.hidden = false;
-  contCamara.innerHTML = `<video id="video-camara" style="width:100%;border-radius:16px" playsinline></video>`;
-  const video = document.getElementById("video-camara");
-
-  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-  video.srcObject = stream;
-  await video.play();
-
-  const detector = new window.BarcodeDetector({ formats: ["code_128", "ean_13", "ean_8", "upc_a"] });
-  const intervalo = setInterval(async () => {
-    try {
-      const codigos = await detector.detect(video);
-      if (codigos.length > 0) {
-        clearInterval(intervalo);
-        stream.getTracks().forEach((t) => t.stop());
-        contCamara.hidden = true;
-        validar(codigos[0].rawValue, dispositivoId, sucursalNombre);
-      }
-    } catch { /* seguir intentando */ }
-  }, 400);
 }
 
 // -------------------------------------------------------------------

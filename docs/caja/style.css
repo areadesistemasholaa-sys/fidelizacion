@@ -55,25 +55,6 @@
   width: 1px; height: 1px;
 }
 
-.caja-boton-camara {
-  width: 100%;
-  max-width: 320px;
-  padding: 1rem;
-  border-radius: 16px;
-  border: 2px solid var(--holaa-negro);
-  background: white;
-  font-weight: 700;
-  font-size: 1rem;
-}
-
-#lector-camara {
-  width: 100%;
-  max-width: 340px;
-  border-radius: 16px;
-  overflow: hidden;
-  margin-top: 1.25rem;
-}
-
 /* ---------- Resultado a pantalla completa ---------- */
 .resultado-pantalla {
   position: fixed;
