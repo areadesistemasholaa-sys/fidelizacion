@@ -1,7 +1,6 @@
 import { db } from "/shared/firebase-config.js";
 import { collection, getDocs, orderBy, query, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { duplicarCampana as opDuplicarCampana, cambiarEstadoCampana as opCambiarEstadoCampana, actualizarCampana as opActualizarCampana, crearCampana as opCrearCampana, guardarPregunta as opGuardarPregunta } from "/shared/firestore-ops.js";
-import { etiquetaTipoBeneficio, resumenBeneficio } from "./beneficios.js";
+import { duplicarCampana as opDuplicarCampana, cambiarEstadoCampana as opCambiarEstadoCampana, actualizarCampana as opActualizarCampana, crearCampana as opCrearCampana, guardarPregunta as opGuardarPregunta, TIPOS_BENEFICIO } from "/shared/firestore-ops.js";
 import { escapeHtml, formatearFecha, badgeEstadoCampana, mostrarToast } from "./utils.js";
 import { puedeGestionarCampanas } from "./menu.js";
 
@@ -19,6 +18,17 @@ const TIPOS_PREGUNTA = [
 ];
 
 const TIPOGRAFIAS = ["Poppins", "Inter", "Montserrat", "Playfair Display", "Nunito", "Quicksand"];
+
+// Copia local e independiente (sin importar de beneficios.js a propósito:
+// dos módulos que dependen uno del otro son frágiles frente al
+// Cache-Control de 1 hora de Hosting en despliegues parciales).
+function resumenBeneficio(b) {
+  if (!b) return "";
+  if (b.tipo === TIPOS_BENEFICIO.PORCENTAJE && b.valor != null) return `${b.valor}% de descuento`;
+  if (b.tipo === TIPOS_BENEFICIO.MONTO_FIJO && b.valor != null) return `$${b.valor} de descuento`;
+  if (b.tipo === TIPOS_BENEFICIO.PRODUCTO_GRATIS) return "Producto gratis";
+  return b.descripcionCliente || "Otro";
+}
 
 export async function renderCampanas(el, ctx) {
   const gestiona = puedeGestionarCampanas(ctx.rol);
