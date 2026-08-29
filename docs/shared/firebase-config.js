@@ -25,12 +25,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 export const firebaseConfig = {
- apiKey: "AIzaSyD_TU_API_KEY_REAL_AQUÍ", // Encuentra tu API Key en la configuración del proyecto en la consola
+ apiKey: "AIzaSyBm8y1fndOw3D6l-SavARmG0B4xkFK07So",
   authDomain: "fidelizacion-7ecb9.firebaseapp.com",
   projectId: "fidelizacion-7ecb9",
   storageBucket: "fidelizacion-7ecb9.firebasestorage.app",
   messagingSenderId: "595498829850",
-  appId: "1:595498829850:web:fidelizacionweb12345"
+  appId: "1:595498829850:web:832ef4d13ce9d50daa29a3"
 };
 
 export const app = initializeApp(firebaseConfig);
