@@ -11,9 +11,29 @@ import {
   onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  collection, query, where, limit, getDocs, orderBy, doc, getDoc,
+  collection, query, where, limit, getDocs, orderBy, doc, getDoc, onSnapshot,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { enviarEncuesta as opEnviarEncuesta } from "/shared/firestore-ops.js";
+
+let unsubscribeBeneficio = null;
+
+function escucharBeneficio(beneficioAsignadoId) {
+  if (unsubscribeBeneficio) { unsubscribeBeneficio(); unsubscribeBeneficio = null; }
+  if (!beneficioAsignadoId) return;
+  unsubscribeBeneficio = onSnapshot(doc(db, "beneficiosAsignados", beneficioAsignadoId), (snap) => {
+    if (snap.exists() && snap.data().estadoUso === "usado") {
+      marcarBeneficioUsadoEnPantalla();
+    }
+  });
+}
+
+function marcarBeneficioUsadoEnPantalla() {
+  const cont = document.getElementById("estado-cupon");
+  if (!cont) return;
+  cont.innerHTML = `
+    <div class="acento-superior"></div>
+    <p class="subtexto" style="font-weight:600;text-align:center;margin-bottom:0">Este beneficio ya fue canjeado en sucursal.</p>`;
+}
 
 const app = document.getElementById("app");
 
@@ -121,8 +141,7 @@ function renderBienvenida() {
       <img src="/shared/logo_holaatrendy.png" alt="HOLAA Trendy" class="logo-holaa" />
     </div>
     <div class="pantalla">
-      ${c.imagen ? `<img class="hero-imagen" src="${c.imagen}" alt="" />` : ""}
-      <div class="icono-campana">${c.tema?.icono || "🛍️"}</div>
+      ${c.imagen ? `<img class="hero-imagen" src="${c.imagen}" alt="" />` : `<div class="acento-superior"></div>`}
       <h1 class="titulo-campana">${escapeHtml(c.nombre)}</h1>
       <p class="subtexto">${escapeHtml(c.mensajeBienvenida || c.descripcion || "Queremos conocerte mejor. Responde nuestra encuesta y recibe un beneficio especial.")}</p>
       <button class="btn btn-primario" id="btn-empezar">Comenzar</button>
@@ -416,18 +435,19 @@ function renderCupon(resultado) {
   const beneficio = resultado.beneficio;
   app.innerHTML = `
     <div class="pantalla centro">
-      <div class="icono-campana">🎉</div>
+      <div class="acento-superior"></div>
       <h1 class="titulo-campana">${escapeHtml(resultado.mensajeFinal)}</h1>
-      ${beneficio ? `
-        <div class="tarjeta-cupon mt-1">
-          ${beneficio.nombre || beneficio.descripcion ? `<div class="beneficio-nombre-texto">${escapeHtml(beneficio.descripcion || beneficio.nombre)}</div>` : ""}
-          <p class="subtexto" style="margin-bottom:0">Muestra este código en caja</p>
-          <svg id="barcode"></svg>
-          <div class="codigo-texto">${beneficio.codigoBarras}</div>
-          <div class="vigencia-texto">Válido hasta: ${new Date(beneficio.fechaExpiracionCodigo).toLocaleString("es-MX")}</div>
-        </div>
-      ` : `<p class="subtexto">Gracias por participar.</p>`}
-      <button class="btn btn-secundario mt-1" id="btn-perfil">Ver mi perfil</button>
+      <div id="estado-cupon">
+        ${beneficio ? `
+          <div class="tarjeta-cupon mt-1">
+            ${beneficio.nombre || beneficio.descripcion ? `<div class="beneficio-nombre-texto">${escapeHtml(beneficio.descripcion || beneficio.nombre)}</div>` : ""}
+            <p class="subtexto" style="margin-bottom:0">Muestra este código en caja</p>
+            <svg id="barcode"></svg>
+            <div class="codigo-texto">${beneficio.codigoBarras}</div>
+            <div class="vigencia-texto">Válido hasta: ${new Date(beneficio.fechaExpiracionCodigo).toLocaleString("es-MX")}</div>
+          </div>
+        ` : `<p class="subtexto">Gracias por participar.</p>`}
+      </div>
     </div>`;
 
   if (beneficio && window.JsBarcode) {
@@ -439,58 +459,13 @@ function renderCupon(resultado) {
       displayValue: false,
       margin: 0,
     });
-  }
-
-  document.getElementById("btn-perfil").onclick = renderPerfil;
-}
-
-// -------------------------------------------------------------------
-// Sección 12 — Perfil del cliente
-// -------------------------------------------------------------------
-async function renderPerfil() {
-  app.innerHTML = `<div class="pantalla centro"><div class="spinner" style="margin:0 auto"></div></div>`;
-  const uid = auth.currentUser?.uid;
-  if (!uid) { renderBienvenida(); return; }
-
-  const clienteSnap = await getDoc(doc(db, "clientes", uid));
-  const cliente = clienteSnap.exists() ? clienteSnap.data() : estado.datosCliente;
-
-  app.innerHTML = `
-    <div class="encabezado">
-      <img src="/shared/logo_holaatrendy.png" alt="HOLAA Trendy" class="logo-holaa" />
-    </div>
-    <div class="pantalla">
-      <h1 class="titulo-campana">Hola, ${escapeHtml(cliente.nombre || "")}</h1>
-      <div class="tarjeta mt-1">
-        <p class="subtexto" style="margin:0"><strong>Teléfono:</strong> ${formatearTelefono(cliente.telefono || "")}</p>
-        <p class="subtexto" style="margin:0"><strong>Sucursal preferida:</strong> ${escapeHtml(nombreSucursal(cliente.sucursalPreferida))}</p>
-      </div>
-      ${estado.ultimoBeneficio ? `
-        <div class="tarjeta-cupon mt-1">
-          ${estado.ultimoBeneficio.nombre || estado.ultimoBeneficio.descripcion ? `<div class="beneficio-nombre-texto">${escapeHtml(estado.ultimoBeneficio.descripcion || estado.ultimoBeneficio.nombre)}</div>` : ""}
-          <p class="subtexto" style="margin-bottom:0">Tu cupón más reciente</p>
-          <svg id="barcode-perfil"></svg>
-          <div class="codigo-texto">${estado.ultimoBeneficio.codigoBarras}</div>
-        </div>` : ""}
-    </div>`;
-
-  if (estado.ultimoBeneficio && window.JsBarcode) {
-    window.JsBarcode("#barcode-perfil", estado.ultimoBeneficio.codigoBarras, {
-      format: "CODE128", lineColor: "#000000", width: 2, height: 60, displayValue: false, margin: 0,
-    });
+    escucharBeneficio(beneficio.beneficioAsignadoId);
   }
 }
 
 // -------------------------------------------------------------------
 // Utilidades
 // -------------------------------------------------------------------
-function nombreSucursal(id) {
-  return estado.sucursales.find((s) => s.sucursalId === id)?.nombre || "—";
-}
-function formatearTelefono(t) {
-  if (!t || t.length !== 10) return t;
-  return `(${t.slice(0, 3)}) ${t.slice(3, 6)}-${t.slice(6)}`;
-}
 function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
 }

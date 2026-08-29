@@ -78,6 +78,14 @@
 
 .icono-campana { font-size: 2.75rem; line-height: 1; margin-bottom: 0.75rem; }
 
+.acento-superior {
+  width: 40px;
+  height: 3px;
+  background: var(--color-primario);
+  border-radius: 999px;
+  margin-bottom: 1.25rem;
+}
+
 .hero-imagen {
   width: 100%;
   border-radius: var(--radio-tarjeta);
@@ -87,10 +95,10 @@
 }
 
 h1.titulo-campana {
-  font-size: 1.6rem;
-  font-weight: 800;
+  font-size: 1.5rem;
+  font-weight: 700;
   margin: 0 0 0.5rem;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 p.subtexto {

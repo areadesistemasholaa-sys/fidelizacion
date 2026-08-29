@@ -20,6 +20,14 @@
       "collectionGroup": "beneficiosAsignados",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "sucursalId", "order": "ASCENDING" },
+        { "fieldPath": "fechaGeneracion", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "beneficiosAsignados",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "campanaId", "order": "ASCENDING" },
         { "fieldPath": "estadoUso", "order": "ASCENDING" }
       ]
