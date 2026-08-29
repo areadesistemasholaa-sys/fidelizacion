@@ -253,7 +253,8 @@ function mostrarResultadoDesdeRespuesta(data) {
     dispositivo_no_autorizado: { color: "rojo", icono: "🚫" },
   };
   const info = mapa[data.resultado] || { color: "rojo", icono: "❌" };
-  mostrarResultado(info.color, info.icono, data.mensaje);
+  const detalle = data.resultado === "verificado" ? (data.beneficioDescripcion || data.beneficioNombre || "") : "";
+  mostrarResultado(info.color, info.icono, data.mensaje, detalle);
 }
 
 function mostrarResultado(color, icono, titulo, detalle) {
