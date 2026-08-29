@@ -221,6 +221,48 @@ export async function guardarPregunta({ campanaId, pregunta }) {
 }
 
 // ===================================================================
+// BENEFICIOS (catálogo) — Sección 6bis. Esto define QUÉ es cada
+// beneficio (nombre, tipo de descuento, valor, texto para el
+// cliente). Es distinto de "beneficiosAsignados", que son los
+// códigos de un solo uso ya generados para un cliente concreto al
+// responder una encuesta (ver enviarEncuesta más abajo).
+// ===================================================================
+export const TIPOS_BENEFICIO = Object.freeze({
+  PORCENTAJE: "porcentaje",
+  MONTO_FIJO: "monto_fijo",
+  PRODUCTO_GRATIS: "producto_gratis",
+  OTRO: "otro",
+});
+
+export async function crearBeneficio(datos) {
+  if (!datos.nombre) throw new Error("El beneficio necesita un nombre.");
+  const ref = doc(collection(db, "beneficios"));
+  const beneficio = {
+    beneficioId: ref.id,
+    nombre: datos.nombre,
+    tipo: datos.tipo || TIPOS_BENEFICIO.OTRO,
+    valor: datos.valor !== undefined && datos.valor !== null && datos.valor !== "" ? Number(datos.valor) : null,
+    descripcionCliente: datos.descripcionCliente || "",
+    activo: datos.activo !== false,
+    fechaCreacion: serverTimestamp(),
+    creadoPor: auth.currentUser.uid,
+  };
+  await setDoc(ref, beneficio);
+  await registrarAuditoria({ accion: "crear_beneficio", modulo: "beneficios", detalle: { beneficioId: ref.id, nombre: beneficio.nombre } });
+  return { beneficioId: ref.id };
+}
+
+export async function actualizarBeneficio({ beneficioId, cambios }) {
+  if (!beneficioId) throw new Error("Falta beneficioId.");
+  const patch = { ...cambios };
+  if (patch.valor !== undefined) {
+    patch.valor = patch.valor !== null && patch.valor !== "" ? Number(patch.valor) : null;
+  }
+  await updateDoc(doc(db, "beneficios", beneficioId), patch);
+  await registrarAuditoria({ accion: "actualizar_beneficio", modulo: "beneficios", detalle: { beneficioId, campos: Object.keys(cambios || {}) } });
+}
+
+// ===================================================================
 // ENCUESTAS / ENVÍO DEL CLIENTE (Sección 33)
 // Se ejecuta con la sesión (email-link) del propio cliente — nunca
 // como admin — y una transacción de Firestore, igual que antes,
@@ -252,6 +294,17 @@ export async function enviarEncuesta({ campanaId, respuestas, datosCliente, cons
   const clienteRef = doc(db, "clientes", clienteId);
   const respuestaRef = doc(collection(db, "respuestas"));
   const beneficioRef = campana.beneficioId ? doc(collection(db, "beneficiosAsignados")) : null;
+
+  // Lectura del beneficio elegido por el administrador para esta
+  // campaña (Sección 6bis). Se guarda una copia (nombre/descripción)
+  // dentro del código generado para que quede fija en el tiempo,
+  // aunque el catálogo cambie después.
+  let beneficioDef = null;
+  if (campana.beneficioId) {
+    const beneficioDefSnap = await getDoc(doc(db, "beneficios", campana.beneficioId));
+    beneficioDef = beneficioDefSnap.exists() ? beneficioDefSnap.data() : null;
+  }
+
   let codigoBarras = null;
   let fechaExpiracionCodigo = null;
 
@@ -301,6 +354,8 @@ export async function enviarEncuesta({ campanaId, respuestas, datosCliente, cons
       tx.set(beneficioRef, {
         beneficioAsignadoId: beneficioRef.id,
         beneficioId: campana.beneficioId,
+        beneficioNombre: beneficioDef?.nombre || null,
+        beneficioDescripcion: beneficioDef?.descripcionCliente || null,
         clienteId,
         campanaId,
         sucursalId,
@@ -318,7 +373,13 @@ export async function enviarEncuesta({ campanaId, respuestas, datosCliente, cons
   return {
     ok: true,
     respuestaId: respuestaRef.id,
-    beneficio: beneficioRef ? { beneficioAsignadoId: beneficioRef.id, codigoBarras, fechaExpiracionCodigo: fechaExpiracionCodigo.toISOString() } : null,
+    beneficio: beneficioRef ? {
+      beneficioAsignadoId: beneficioRef.id,
+      codigoBarras,
+      fechaExpiracionCodigo: fechaExpiracionCodigo.toISOString(),
+      nombre: beneficioDef?.nombre || null,
+      descripcion: beneficioDef?.descripcionCliente || null,
+    } : null,
     mensajeFinal: campana.mensajeFinal || "¡Gracias por participar!",
   };
 }
@@ -388,7 +449,13 @@ export async function validarBeneficio({ codigoBarras, dispositivoId }) {
         validadoPor: dispositivoSnap.data().nombreDispositivo,
         fechaHoraValidacion: serverTimestamp(),
       });
-      return { resultado: "verificado", mensaje: "VERIFICADO", beneficioId: b.beneficioAsignadoId };
+      return {
+        resultado: "verificado",
+        mensaje: "VERIFICADO",
+        beneficioId: b.beneficioAsignadoId,
+        beneficioNombre: b.beneficioNombre || null,
+        beneficioDescripcion: b.beneficioDescripcion || null,
+      };
     });
   } catch (e) {
     // Si firestore.rules rechaza la escritura (p.ej. carrera entre dos
