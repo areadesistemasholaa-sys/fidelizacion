@@ -210,6 +210,7 @@ input:focus, select:focus, textarea:focus {
   border: 2px dashed var(--color-primario);
 }
 .tarjeta-cupon svg { max-width: 100%; margin: 1rem 0 0.5rem; }
+.beneficio-nombre-texto { font-size: 1.05rem; font-weight: 700; color: var(--color-primario); margin-bottom: 0.5rem; }
 .codigo-texto {
   font-family: "Courier New", monospace;
   font-size: 1.1rem;

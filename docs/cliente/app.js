@@ -469,6 +469,7 @@ function renderCupon(resultado) {
       <h1 class="titulo-campana">${escapeHtml(resultado.mensajeFinal)}</h1>
       ${beneficio ? `
         <div class="tarjeta-cupon mt-1">
+          ${beneficio.nombre || beneficio.descripcion ? `<div class="beneficio-nombre-texto">${escapeHtml(beneficio.descripcion || beneficio.nombre)}</div>` : ""}
           <p class="subtexto" style="margin-bottom:0">Muestra este código en caja</p>
           <svg id="barcode"></svg>
           <div class="codigo-texto">${beneficio.codigoBarras}</div>
@@ -515,6 +516,7 @@ async function renderPerfil() {
       </div>
       ${estado.ultimoBeneficio ? `
         <div class="tarjeta-cupon mt-1">
+          ${estado.ultimoBeneficio.nombre || estado.ultimoBeneficio.descripcion ? `<div class="beneficio-nombre-texto">${escapeHtml(estado.ultimoBeneficio.descripcion || estado.ultimoBeneficio.nombre)}</div>` : ""}
           <p class="subtexto" style="margin-bottom:0">Tu cupón más reciente</p>
           <svg id="barcode-perfil"></svg>
           <div class="codigo-texto">${estado.ultimoBeneficio.codigoBarras}</div>
