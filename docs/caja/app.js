@@ -15,8 +15,51 @@ import { configurarDispositivoCaja, validarBeneficio as opValidarBeneficio } fro
 const app = document.getElementById("app");
 const LS_KEY = "holaa_caja_dispositivo_id";
 const LS_SUCURSAL_NOMBRE = "holaa_caja_sucursal_nombre";
+const HISTORIAL_MAX = 50;
 
 let bloqueadoEnvio = false;
+
+// -------------------------------------------------------------------
+// Historial de escaneos (Sección 20) — queda guardado en este mismo
+// dispositivo (localStorage), por si se recarga la página o se cierra
+// el navegador. No requiere permisos nuevos en Firestore: es puramente
+// una bitácora local de lo que esta caja ha escaneado.
+// -------------------------------------------------------------------
+function claveHistorial(dispositivoId) {
+  return `holaa_caja_historial_${dispositivoId}`;
+}
+
+function obtenerHistorial(dispositivoId) {
+  try {
+    return JSON.parse(localStorage.getItem(claveHistorial(dispositivoId)) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function agregarAlHistorial(dispositivoId, entrada) {
+  const lista = obtenerHistorial(dispositivoId);
+  lista.unshift({ ...entrada, hora: new Date().toISOString() });
+  localStorage.setItem(claveHistorial(dispositivoId), JSON.stringify(lista.slice(0, HISTORIAL_MAX)));
+}
+
+function limpiarHistorial(dispositivoId) {
+  localStorage.removeItem(claveHistorial(dispositivoId));
+}
+
+const ETIQUETA_RESULTADO = {
+  verificado: { texto: "Verificado", icono: "✅", clase: "verde" },
+  ya_aplicado: { texto: "Ya aplicado", icono: "❌", clase: "rojo" },
+  sucursal_incorrecta: { texto: "Sucursal incorrecta", icono: "⚠️", clase: "amarillo" },
+  no_valido: { texto: "No válido", icono: "❌", clase: "rojo" },
+  dispositivo_no_autorizado: { texto: "Dispositivo no autorizado", icono: "🚫", clase: "rojo" },
+  error: { texto: "Error de conexión", icono: "❌", clase: "rojo" },
+};
+
+function formatearHora(iso) {
+  const d = new Date(iso);
+  return d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
 
 init();
 
@@ -101,7 +144,8 @@ function renderPantallaEscaneo(dispositivoId, sucursalNombre) {
       <input type="text" id="input-scan" autofocus autocomplete="off" />
       <button class="caja-boton-camara" id="btn-camara">📷 Usar la cámara</button>
       <div id="lector-camara" hidden></div>
-    </div>`;
+    </div>
+    <div class="caja-historial" id="caja-historial"></div>`;
 
   document.getElementById("btn-reconfigurar").onclick = () => {
     if (confirm("¿Cambiar la sucursal de esta terminal? Se pedirá volver a configurarla.")) {
@@ -125,6 +169,54 @@ function renderPantallaEscaneo(dispositivoId, sucursalNombre) {
   inputScan.addEventListener("input", () => { buffer = inputScan.value; });
 
   document.getElementById("btn-camara").onclick = () => iniciarCamara(dispositivoId, sucursalNombre);
+
+  pintarHistorial(dispositivoId);
+}
+
+// -------------------------------------------------------------------
+// Pinta la lista de escaneos recientes de esta caja, sin recargar
+// toda la pantalla (para no perder el foco del lector físico).
+// -------------------------------------------------------------------
+function pintarHistorial(dispositivoId) {
+  const cont = document.getElementById("caja-historial");
+  if (!cont) return;
+  const lista = obtenerHistorial(dispositivoId);
+
+  if (lista.length === 0) {
+    cont.innerHTML = `
+      <div class="caja-historial-encabezado"><h2>Historial de hoy</h2></div>
+      <div class="caja-historial-vacio">Aún no has escaneado ningún cupón.</div>`;
+    return;
+  }
+
+  cont.innerHTML = `
+    <div class="caja-historial-encabezado">
+      <h2>Historial de hoy (${lista.length})</h2>
+      <button id="btn-limpiar-historial">Limpiar</button>
+    </div>
+    <div class="caja-historial-lista">
+      ${lista.map((item) => {
+        const info = ETIQUETA_RESULTADO[item.resultado] || ETIQUETA_RESULTADO.error;
+        return `
+          <div class="caja-historial-item ${info.clase}">
+            <span class="caja-historial-icono">${info.icono}</span>
+            <div class="caja-historial-info">
+              <div class="caja-historial-codigo">${escapeHtml(item.codigoBarras)}</div>
+              <div class="caja-historial-detalle">${info.texto}</div>
+            </div>
+            <div class="caja-historial-hora">${formatearHora(item.hora)}</div>
+          </div>`;
+      }).join("")}
+    </div>`;
+
+  const btnLimpiar = document.getElementById("btn-limpiar-historial");
+  if (btnLimpiar) {
+    btnLimpiar.onclick = () => {
+      if (!confirm("¿Borrar el historial de escaneos de esta caja?")) return;
+      limpiarHistorial(dispositivoId);
+      pintarHistorial(dispositivoId);
+    };
+  }
 }
 
 function mantenerFoco(el) {
@@ -173,8 +265,10 @@ async function validar(codigoBarras, dispositivoId, sucursalNombre) {
   try {
     const r = await opValidarBeneficio({ codigoBarras, dispositivoId });
     mostrarResultadoDesdeRespuesta(r);
+    agregarAlHistorial(dispositivoId, { codigoBarras, resultado: r.resultado, mensaje: r.mensaje });
   } catch (e) {
     mostrarResultado("rojo", "❌", "ERROR DE CONEXIÓN", e.message || "Intenta de nuevo.");
+    agregarAlHistorial(dispositivoId, { codigoBarras, resultado: "error", mensaje: e.message || "Error de conexión" });
   }
 
   setTimeout(() => {

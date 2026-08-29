@@ -116,3 +116,78 @@
   font-size: 1rem;
   font-family: inherit;
 }
+
+/* ---------- Historial de escaneos ---------- */
+.caja-historial {
+  border-top: 1px solid #EDEDED;
+  padding: 1.25rem 1.25rem 2rem;
+  max-height: 42vh;
+  overflow-y: auto;
+}
+
+.caja-historial-encabezado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.caja-historial-encabezado h2 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--holaa-negro);
+  margin: 0;
+}
+.caja-historial-encabezado button {
+  background: none;
+  border: none;
+  color: var(--holaa-gris-texto);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.caja-historial-vacio {
+  font-size: 0.85rem;
+  color: var(--holaa-gris-texto);
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.caja-historial-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.caja-historial-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  background: #F5F5F5;
+  border-left: 4px solid transparent;
+}
+.caja-historial-item.verde { border-left-color: #1B8A45; }
+.caja-historial-item.rojo { border-left-color: #C41E3A; }
+.caja-historial-item.amarillo { border-left-color: #D69E00; }
+
+.caja-historial-icono { font-size: 1.1rem; }
+
+.caja-historial-info { flex: 1; min-width: 0; }
+.caja-historial-codigo {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--holaa-negro);
+  font-family: monospace;
+}
+.caja-historial-detalle {
+  font-size: 0.75rem;
+  color: var(--holaa-gris-texto);
+}
+
+.caja-historial-hora {
+  font-size: 0.72rem;
+  color: var(--holaa-gris-texto);
+  white-space: nowrap;
+}
