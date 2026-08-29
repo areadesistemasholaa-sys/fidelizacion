@@ -1,0 +1,228 @@
+/* Portal Cliente — mobile primero, minimalista, pocos elementos por
+   pantalla (Sección 31.1). El tema dinámico de campaña (Sección 9)
+   sobreescribe --color-primario/--color-fondo/--fuente-principal/etc.
+   inyectado desde app.js; aquí solo se define la estructura. */
+
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-fondo);
+}
+
+.cargando {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+}
+.logo-carga { height: 56px; }
+.spinner {
+  width: 28px; height: 28px;
+  border: 3px solid var(--holaa-gris-fondo);
+  border-top-color: var(--color-primario);
+  border-radius: 50%;
+  animation: girar 0.8s linear infinite;
+}
+@keyframes girar { to { transform: rotate(360deg); } }
+
+/* ---------- Encabezado ---------- */
+.encabezado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+}
+
+/* ---------- Barra de progreso (encuesta) ---------- */
+.progreso-wrap {
+  padding: 0 1.25rem;
+}
+.progreso-track {
+  height: 6px;
+  background: var(--holaa-gris-fondo);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progreso-fill {
+  height: 100%;
+  background: var(--color-primario);
+  border-radius: 999px;
+  transition: width 300ms ease;
+}
+.progreso-texto {
+  font-size: 0.78rem;
+  color: var(--holaa-gris-texto);
+  margin-top: 0.4rem;
+}
+
+/* ---------- Pantalla central (una idea por pantalla) ---------- */
+.pantalla {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 1.5rem 1.5rem 2rem;
+  max-width: 560px;
+  margin: 0 auto;
+  width: 100%;
+  animation: aparecer 260ms ease;
+}
+@keyframes aparecer {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.icono-campana { font-size: 2.75rem; line-height: 1; margin-bottom: 0.75rem; }
+
+.hero-imagen {
+  width: 100%;
+  border-radius: var(--radio-tarjeta);
+  object-fit: cover;
+  max-height: 220px;
+  margin-bottom: 1.25rem;
+}
+
+h1.titulo-campana {
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+p.subtexto {
+  color: var(--holaa-gris-texto);
+  font-size: 1rem;
+  line-height: 1.5;
+  margin: 0 0 1.75rem;
+}
+
+/* ---------- Preguntas ---------- */
+.pregunta-texto {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 1.25rem;
+  line-height: 1.35;
+}
+
+.opciones-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 1.75rem;
+}
+
+.opcion-btn {
+  text-align: left;
+  padding: 0.9rem 1.1rem;
+  border-radius: var(--radio-tarjeta);
+  border: 1.5px solid var(--holaa-gris-fondo);
+  background: var(--holaa-blanco);
+  font-size: 1rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: border-color var(--transicion), background var(--transicion);
+}
+.opcion-btn:hover { border-color: var(--color-primario); }
+.opcion-btn.seleccionada {
+  border-color: var(--color-primario);
+  background: color-mix(in srgb, var(--color-primario) 8%, white);
+}
+.opcion-check {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--holaa-gris-fondo);
+  flex-shrink: 0;
+}
+.opcion-btn.seleccionada .opcion-check {
+  border-color: var(--color-primario);
+  background: var(--color-primario);
+}
+
+input[type="text"], input[type="tel"], input[type="number"], input[type="email"],
+input[type="date"], select, textarea {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radio-tarjeta);
+  border: 1.5px solid var(--holaa-gris-fondo);
+  font-size: 1rem;
+  font-family: inherit;
+  margin-bottom: 1.25rem;
+  background: var(--holaa-blanco);
+  color: var(--color-texto);
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--color-primario);
+}
+
+.escala-fila { display: flex; gap: 0.5rem; margin-bottom: 1.75rem; }
+.escala-btn {
+  flex: 1;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  border: 1.5px solid var(--holaa-gris-fondo);
+  background: var(--holaa-blanco);
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.escala-btn.seleccionada { border-color: var(--color-primario); background: var(--color-primario); color: white; }
+
+.sino-fila { display: flex; gap: 0.75rem; margin-bottom: 1.75rem; }
+.sino-btn { flex: 1; padding: 0.9rem; border-radius: var(--radio-tarjeta); border: 1.5px solid var(--holaa-gris-fondo); background: white; font-weight: 600; }
+.sino-btn.seleccionada { border-color: var(--color-primario); background: var(--color-primario); color: white; }
+
+/* ---------- Navegación inferior ---------- */
+.nav-inferior {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem calc(1.25rem + env(safe-area-inset-bottom));
+  max-width: 560px;
+  margin: 0 auto;
+  width: 100%;
+}
+.nav-inferior .btn { flex: 1; }
+
+/* ---------- Consentimientos ---------- */
+.consentimiento-fila {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--holaa-gris-fondo);
+}
+.consentimiento-fila input { width: auto; margin: 0.15rem 0 0; }
+.consentimiento-texto { font-size: 0.92rem; line-height: 1.45; }
+.consentimiento-texto .obligatorio { color: var(--color-primario); font-weight: 600; }
+
+/* ---------- Cupón / beneficio ---------- */
+.tarjeta-cupon {
+  background: var(--holaa-blanco);
+  border-radius: var(--radio-tarjeta);
+  box-shadow: var(--sombra-suave);
+  padding: 1.75rem 1.25rem;
+  text-align: center;
+  border: 2px dashed var(--color-primario);
+}
+.tarjeta-cupon svg { max-width: 100%; margin: 1rem 0 0.5rem; }
+.codigo-texto {
+  font-family: "Courier New", monospace;
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  color: var(--holaa-gris-texto);
+}
+.vigencia-texto { font-size: 0.82rem; color: var(--holaa-gris-texto); margin-top: 0.75rem; }
+
+/* ---------- Utilidades ---------- */
+.error-texto { color: #C20152; font-size: 0.88rem; margin: -0.75rem 0 1rem; }
+.centro { text-align: center; }
+.mt-1 { margin-top: 1rem; }
+
+@media (min-width: 640px) {
+  .pantalla { padding-top: 3rem; padding-bottom: 3rem; }
+}

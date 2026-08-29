@@ -1,0 +1,118 @@
+/* ===================================================================
+   HOLAA Trendy — Identidad visual base (Sección 31)
+   Paleta oficial extraída del logotipo:
+     Magenta HOLAA:  #C20152
+     Negro:          #000000
+     Blanco:         #FFFFFF
+     Gris:           #4A4A4A / #F5F5F5
+
+   Estas variables son el TEMA POR DEFECTO. El Portal Cliente las
+   sobreescribe dinámicamente por campaña (Sección 9); el Panel
+   Administrativo y el Panel Caja SIEMPRE usan estos valores base,
+   nunca el tema de campaña (Sección 9.2 / 31.5).
+   =================================================================== */
+
+:root {
+  --holaa-magenta: #C20152;
+  --holaa-negro: #000000;
+  --holaa-blanco: #FFFFFF;
+  --holaa-gris-texto: #4A4A4A;
+  --holaa-gris-fondo: #F5F5F5;
+
+  /* Alias genéricos que el tema dinámico de campaña puede sobreescribir */
+  --color-primario: var(--holaa-magenta);
+  --color-secundario: var(--holaa-negro);
+  --color-fondo: var(--holaa-blanco);
+  --color-texto: var(--holaa-negro);
+  --fuente-principal: "Poppins", "Inter", "Montserrat", -apple-system, sans-serif;
+  --radio-tarjeta: 16px;
+
+  --sombra-suave: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --transicion: 180ms ease;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--fuente-principal);
+  color: var(--color-texto);
+  background: var(--color-fondo);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  padding: 0.85em 1.6em;
+  border-radius: var(--radio-tarjeta);
+  border: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: transform var(--transicion), box-shadow var(--transicion), opacity var(--transicion);
+}
+
+.btn:focus-visible {
+  outline: 3px solid var(--color-primario);
+  outline-offset: 2px;
+}
+
+.btn-primario {
+  background: var(--color-primario);
+  color: var(--holaa-blanco);
+}
+.btn-primario:hover { transform: translateY(-1px); box-shadow: var(--sombra-suave); }
+.btn-primario:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.btn-secundario {
+  background: transparent;
+  color: var(--color-primario);
+  border: 1.5px solid var(--color-primario);
+}
+
+.tarjeta {
+  background: var(--holaa-blanco);
+  border-radius: var(--radio-tarjeta);
+  box-shadow: var(--sombra-suave);
+  padding: 1.5rem;
+}
+
+.tarjeta.recto { border-radius: 4px; }
+
+.logo-holaa {
+  height: 42px;
+  width: auto;
+  object-fit: contain;
+}
+
+.solo-lectura-tag {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: var(--holaa-gris-fondo);
+  color: var(--holaa-gris-texto);
+  padding: 0.2em 0.6em;
+  border-radius: 999px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}

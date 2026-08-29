@@ -1,0 +1,13 @@
+{
+  "name": "HOLAA Trendy",
+  "short_name": "HOLAA Trendy",
+  "description": "Encuestas, beneficios y promociones HOLAA Trendy",
+  "start_url": "/cliente",
+  "scope": "/cliente",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#C20152",
+  "icons": [
+    { "src": "/shared/logo_holaatrendy.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "HOLAA Trendy — Caja",
+  "short_name": "HOLAA Caja",
+  "description": "Validación de cupones HOLAA Trendy en caja",
+  "start_url": "/caja",
+  "scope": "/caja",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    { "src": "/shared/logo_holaatrendy.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

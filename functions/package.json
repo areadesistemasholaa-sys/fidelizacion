@@ -1,0 +1,21 @@
+{
+  "name": "holaa-trendy-functions",
+  "description": "Cloud Functions — HOLAA Trendy: campañas, beneficios/validación de caja, exportación a Excel, auditoría",
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "serve": "firebase emulators:start --only functions,firestore,auth,storage",
+    "shell": "firebase functions:shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.3.0",
+    "firebase-functions": "^5.0.0",
+    "exceljs": "^4.4.0"
+  },
+  "private": true
+}

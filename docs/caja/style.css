@@ -1,0 +1,118 @@
+/* Panel Caja — la interfaz más minimalista de las tres (Sección 31.5).
+   Pantalla casi en blanco, un área central de escaneo, resultado en
+   colores de estado (verde/rojo/amarillo) por encima de la paleta de
+   marca, para priorizar lectura instantánea. */
+
+.caja-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: #FAFAFA;
+}
+
+.caja-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #EDEDED;
+}
+.caja-sucursal {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--holaa-gris-texto);
+}
+
+.caja-centro {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  text-align: center;
+}
+
+.caja-icono-espera {
+  font-size: 3.5rem;
+  margin-bottom: 1rem;
+}
+
+.caja-instruccion {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--holaa-negro);
+  margin-bottom: 1.5rem;
+}
+
+/* Campo invisible/oculto que recibe el "tecleo" del lector físico de
+   código de barras (Sección 20.1) — siempre enfocado. */
+#input-scan {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px; height: 1px;
+}
+
+.caja-boton-camara {
+  width: 100%;
+  max-width: 320px;
+  padding: 1rem;
+  border-radius: 16px;
+  border: 2px solid var(--holaa-negro);
+  background: white;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+#lector-camara {
+  width: 100%;
+  max-width: 340px;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-top: 1.25rem;
+}
+
+/* ---------- Resultado a pantalla completa ---------- */
+.resultado-pantalla {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
+  color: white;
+  animation: entrar-resultado 200ms ease;
+}
+@keyframes entrar-resultado { from { opacity: 0; } to { opacity: 1; } }
+
+.resultado-pantalla.verde { background: #1B8A45; }
+.resultado-pantalla.rojo { background: #C41E3A; }
+.resultado-pantalla.amarillo { background: #D69E00; color: #1a1a1a; }
+
+.resultado-icono { font-size: 5rem; margin-bottom: 1rem; }
+.resultado-titulo { font-size: 2rem; font-weight: 800; margin: 0 0 0.5rem; letter-spacing: 0.01em; }
+.resultado-detalle { font-size: 1rem; opacity: 0.9; margin-bottom: 2rem; }
+
+.caja-config-form {
+  width: 100%;
+  max-width: 360px;
+  text-align: left;
+}
+.caja-config-form label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 1rem 0 0.4rem;
+}
+.caja-config-form select, .caja-config-form input {
+  width: 100%;
+  padding: 0.85rem;
+  border-radius: 12px;
+  border: 1.5px solid #E5E5E5;
+  font-size: 1rem;
+  font-family: inherit;
+}
