@@ -8,15 +8,18 @@
 
 import { auth, db } from "/shared/firebase-config.js";
 import { signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, query, where, orderBy, limit, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { configurarDispositivoCaja, validarBeneficio as opValidarBeneficio } from "/shared/firestore-ops.js";
 
 const app = document.getElementById("app");
 const LS_KEY = "holaa_caja_dispositivo_id";
 const LS_SUCURSAL_NOMBRE = "holaa_caja_sucursal_nombre";
+const LS_SUCURSAL_ID = "holaa_caja_sucursal_id";
 const HISTORIAL_MAX = 50;
+const REGISTROS_MAX = 40;
 
 let bloqueadoEnvio = false;
+let unsubscribeRegistros = null;
 
 // -------------------------------------------------------------------
 // Historial de escaneos (Sección 20) — queda guardado en este mismo
@@ -72,7 +75,7 @@ async function init() {
   if (!dispositivoId) {
     renderConfiguracion();
   } else {
-    renderPantallaEscaneo(dispositivoId, localStorage.getItem(LS_SUCURSAL_NOMBRE) || "");
+    renderPantallaEscaneo(dispositivoId, localStorage.getItem(LS_SUCURSAL_NOMBRE) || "", localStorage.getItem(LS_SUCURSAL_ID) || "");
   }
 }
 
@@ -120,7 +123,8 @@ async function renderConfiguracion() {
       const resultado = await configurarDispositivoCaja({ sucursalId, pinIntento: pin, nombreDispositivo });
       localStorage.setItem(LS_KEY, resultado.dispositivoId);
       localStorage.setItem(LS_SUCURSAL_NOMBRE, resultado.sucursalNombre);
-      renderPantallaEscaneo(resultado.dispositivoId, resultado.sucursalNombre);
+      localStorage.setItem(LS_SUCURSAL_ID, sucursalId);
+      renderPantallaEscaneo(resultado.dispositivoId, resultado.sucursalNombre, sucursalId);
     } catch (e) {
       errorEl.textContent = e.message || "No se pudo configurar el dispositivo.";
       errorEl.hidden = false;
@@ -131,7 +135,7 @@ async function renderConfiguracion() {
 // -------------------------------------------------------------------
 // Sección 20.1/20.3 — Pantalla de escaneo y validación
 // -------------------------------------------------------------------
-function renderPantallaEscaneo(dispositivoId, sucursalNombre) {
+function renderPantallaEscaneo(dispositivoId, sucursalNombre, sucursalId) {
   app.innerHTML = `
     <div class="caja-header">
       <span class="caja-sucursal">📍 ${escapeHtml(sucursalNombre)}</span>
@@ -142,12 +146,15 @@ function renderPantallaEscaneo(dispositivoId, sucursalNombre) {
       <div class="caja-instruccion">Usa el escáner para leer el código del cupón del cliente</div>
       <input type="text" id="input-scan" autofocus autocomplete="off" />
     </div>
+    <div class="caja-historial" id="caja-registros"></div>
     <div class="caja-historial" id="caja-historial"></div>`;
 
   document.getElementById("btn-reconfigurar").onclick = () => {
     if (confirm("¿Cambiar la sucursal de esta terminal? Se pedirá volver a configurarla.")) {
+      if (unsubscribeRegistros) { unsubscribeRegistros(); unsubscribeRegistros = null; }
       localStorage.removeItem(LS_KEY);
       localStorage.removeItem(LS_SUCURSAL_NOMBRE);
+      localStorage.removeItem(LS_SUCURSAL_ID);
       renderConfiguracion();
     }
   };
@@ -158,7 +165,7 @@ function renderPantallaEscaneo(dispositivoId, sucursalNombre) {
   let buffer = "";
   inputScan.addEventListener("keydown", (ev) => {
     if (ev.key === "Enter") {
-      if (buffer.trim()) validar(buffer.trim(), dispositivoId, sucursalNombre);
+      if (buffer.trim()) validar(buffer.trim(), dispositivoId, sucursalNombre, sucursalId);
       buffer = "";
       inputScan.value = "";
     }
@@ -166,6 +173,60 @@ function renderPantallaEscaneo(dispositivoId, sucursalNombre) {
   inputScan.addEventListener("input", () => { buffer = inputScan.value; });
 
   pintarHistorial(dispositivoId);
+  escucharRegistros(sucursalId);
+}
+
+// -------------------------------------------------------------------
+// Sección 20 (nuevo) — Lista en vivo de registros de esta sucursal.
+// A diferencia del "Historial de hoy" (que es local a esta caja y
+// solo lo que ELLA escaneó), esto viene directo de Firestore vía
+// onSnapshot: muestra a TODOS los clientes que se registraron en
+// esta sucursal (de cualquier dispositivo/celular), en tiempo real,
+// y cuando alguien escanea su cupón el mismo doc pasa a "usado" sin
+// que la caja tenga que hacer nada extra — el listener ya está
+// viendo ese documento.
+// -------------------------------------------------------------------
+function escucharRegistros(sucursalId) {
+  if (unsubscribeRegistros) { unsubscribeRegistros(); unsubscribeRegistros = null; }
+  const cont = document.getElementById("caja-registros");
+  if (!cont || !sucursalId) return;
+
+  const q = query(
+    collection(db, "beneficiosAsignados"),
+    where("sucursalId", "==", sucursalId),
+    orderBy("fechaGeneracion", "desc"),
+    limit(REGISTROS_MAX)
+  );
+
+  unsubscribeRegistros = onSnapshot(q, (snap) => {
+    if (snap.empty) {
+      cont.innerHTML = `
+        <div class="caja-historial-encabezado"><h2>Registros de esta sucursal</h2></div>
+        <div class="caja-historial-vacio">Aún no hay clientes registrados hoy.</div>`;
+      return;
+    }
+    cont.innerHTML = `
+      <div class="caja-historial-encabezado"><h2>Registros de esta sucursal (${snap.size})</h2></div>
+      <div class="caja-historial-lista">
+        ${snap.docs.map((d) => {
+          const b = d.data();
+          const usado = b.estadoUso === "usado";
+          return `
+            <div class="caja-historial-item ${usado ? "verde" : "amarillo"}">
+              <span class="caja-historial-icono">${usado ? "✅" : "🕓"}</span>
+              <div class="caja-historial-info">
+                <div class="caja-historial-codigo">${escapeHtml(b.clienteNombre || "Cliente sin nombre")}</div>
+                <div class="caja-historial-detalle">${escapeHtml(b.beneficioNombre || "Beneficio")} — ${usado ? "Ya usado" : "Pendiente de usar"}</div>
+              </div>
+              <div class="caja-historial-hora">${b.fechaGeneracion?.toDate ? formatearHora(b.fechaGeneracion.toDate().toISOString()) : ""}</div>
+            </div>`;
+        }).join("")}
+      </div>`;
+  }, () => {
+    cont.innerHTML = `
+      <div class="caja-historial-encabezado"><h2>Registros de esta sucursal</h2></div>
+      <div class="caja-historial-vacio">No pudimos cargar los registros en vivo.</div>`;
+  });
 }
 
 // -------------------------------------------------------------------
@@ -223,7 +284,7 @@ function mantenerFoco(el) {
 // -------------------------------------------------------------------
 // Sección 20.3 — Llamada a la Cloud Function de validación
 // -------------------------------------------------------------------
-async function validar(codigoBarras, dispositivoId, sucursalNombre) {
+async function validar(codigoBarras, dispositivoId, sucursalNombre, sucursalId) {
   if (bloqueadoEnvio) return;
   bloqueadoEnvio = true;
 
@@ -240,7 +301,7 @@ async function validar(codigoBarras, dispositivoId, sucursalNombre) {
 
   setTimeout(() => {
     bloqueadoEnvio = false;
-    renderPantallaEscaneo(dispositivoId, sucursalNombre);
+    renderPantallaEscaneo(dispositivoId, sucursalNombre, sucursalId);
   }, 2600);
 }
 

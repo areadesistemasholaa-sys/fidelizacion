@@ -298,9 +298,9 @@ function renderDatosCliente() {
   app.innerHTML = `
     <div class="pantalla">
       <h1 class="pregunta-texto">Casi terminamos</h1>
-      <p class="subtexto">Déjanos tu nombre para personalizar tu experiencia.</p>
+      <p class="subtexto">Déjanos tu nombre y tu WhatsApp para avisarte de tus promociones.</p>
       <input type="text" id="input-nombre" placeholder="Nombre completo" value="${estado.datosCliente.nombre}" />
-      <input type="email" id="input-email" placeholder="Correo electrónico (opcional)" value="${estado.datosCliente.email}" />
+      <input type="tel" id="input-telefono" placeholder="WhatsApp (10 dígitos)" maxlength="10" inputmode="numeric" value="${estado.datosCliente.telefono}" />
       <div id="error-datos" class="error-texto" hidden></div>
     </div>
     <div class="nav-inferior">
@@ -311,14 +311,21 @@ function renderDatosCliente() {
   document.getElementById("btn-atras-datos").onclick = () => { estado.pasoActual = estado.preguntas.length - 1; renderPaso(); };
   document.getElementById("btn-siguiente-datos").onclick = () => {
     const nombre = document.getElementById("input-nombre").value.trim();
+    const telefono = document.getElementById("input-telefono").value.trim();
+    const err = document.getElementById("error-datos");
     if (!nombre) {
-      const err = document.getElementById("error-datos");
       err.textContent = "Cuéntanos tu nombre para continuar.";
       err.hidden = false;
       return;
     }
+    if (!/^\d{10}$/.test(telefono)) {
+      err.textContent = "Ingresa tu WhatsApp a 10 dígitos.";
+      err.hidden = false;
+      return;
+    }
+    err.hidden = true;
     estado.datosCliente.nombre = nombre;
-    estado.datosCliente.email = document.getElementById("input-email").value.trim();
+    estado.datosCliente.telefono = telefono;
     renderPrivacidad();
   };
 }
@@ -333,7 +340,7 @@ function renderPrivacidad() {
       <div class="consentimiento-fila">
         <input type="checkbox" id="chk-privacidad" />
         <label class="consentimiento-texto" for="chk-privacidad">
-          He leído y acepto el <a href="#" id="link-aviso" style="color:var(--color-primario)">aviso de privacidad</a> de HOLAA Trendy. <span class="obligatorio">*Obligatorio</span>
+          He leído y acepto el <a href="/cliente/aviso-privacidad.html" target="_blank" rel="noopener" id="link-aviso" style="color:var(--color-primario)">aviso de privacidad</a> de HOLAA Trendy. <span class="obligatorio">*Obligatorio</span>
         </label>
       </div>
       <div class="consentimiento-fila">

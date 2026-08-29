@@ -357,6 +357,7 @@ export async function enviarEncuesta({ campanaId, respuestas, datosCliente, cons
         beneficioNombre: beneficioDef?.nombre || null,
         beneficioDescripcion: beneficioDef?.descripcionCliente || null,
         clienteId,
+        clienteNombre: datosClienteBase.nombre || null,
         campanaId,
         sucursalId,
         codigoBarras,
