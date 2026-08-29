@@ -31,7 +31,11 @@ export async function renderClientes(el, ctx) {
     };
   }
 
-  const snap = await getDocs(query(collection(db, "clientes"), orderBy("fechaRegistro", "desc"), limit(200)));
+  const [snap, sucursalesSnap] = await Promise.all([
+    getDocs(query(collection(db, "clientes"), orderBy("fechaRegistro", "desc"), limit(200))),
+    getDocs(collection(db, "sucursales")),
+  ]);
+  const mapaSucursales = Object.fromEntries(sucursalesSnap.docs.map((d) => [d.data().sucursalId, d.data().nombre]));
   const cont = document.getElementById("lista-clientes");
   if (snap.empty) {
     cont.innerHTML = `<div class="mensaje-vacio"><div class="icono">👥</div>Todavía no hay clientes registrados.</div>`;
@@ -46,7 +50,7 @@ export async function renderClientes(el, ctx) {
             <td>${escapeHtml(c.nombre || "—")}</td>
             <td>${escapeHtml(c.telefono || "—")}</td>
             <td>${escapeHtml(c.email || "—")}</td>
-            <td>${escapeHtml(c.sucursalPreferida || "—")}</td>
+            <td>${escapeHtml(mapaSucursales[c.sucursalPreferida] || "—")}</td>
             <td>${formatearFecha(c.fechaRegistro)}</td>
           </tr>`; }).join("")}
       </tbody>

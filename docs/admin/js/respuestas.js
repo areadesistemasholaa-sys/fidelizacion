@@ -37,20 +37,28 @@ async function cargarLista(campanaId) {
   const cont = document.getElementById("lista-respuestas");
   let q = query(collection(db, "respuestas"), orderBy("fecha", "desc"), limit(150));
   if (campanaId) q = query(collection(db, "respuestas"), where("campanaId", "==", campanaId), orderBy("fecha", "desc"), limit(150));
-  const snap = await getDocs(q);
+  const [snap, sucursalesSnap, clientesSnap] = await Promise.all([
+    getDocs(q),
+    getDocs(collection(db, "sucursales")),
+    getDocs(collection(db, "clientes")),
+  ]);
 
   if (snap.empty) {
     cont.innerHTML = `<div class="mensaje-vacio"><div class="icono">📝</div>Aún no hay respuestas registradas.</div>`;
     return;
   }
+
+  const mapaSucursales = Object.fromEntries(sucursalesSnap.docs.map((d) => [d.data().sucursalId, d.data().nombre]));
+  const mapaClientes = Object.fromEntries(clientesSnap.docs.map((d) => [d.data().clienteId, d.data().nombre]));
+
   cont.innerHTML = `
     <table>
       <thead><tr><th>Cliente</th><th>Sucursal</th><th>Versión</th><th>Fecha</th></tr></thead>
       <tbody>
         ${snap.docs.map((d) => { const r = d.data(); return `
           <tr>
-            <td>${escapeHtml(r.clienteId).slice(0, 10)}…</td>
-            <td>${escapeHtml(r.sucursalId || "—")}</td>
+            <td>${escapeHtml(mapaClientes[r.clienteId] || (r.clienteId ? r.clienteId.slice(0, 10) + "…" : "—"))}</td>
+            <td>${escapeHtml(mapaSucursales[r.sucursalId] || "—")}</td>
             <td>v${r.versionCampana || 1}</td>
             <td>${formatearFechaHora(r.fecha)}</td>
           </tr>`; }).join("")}

@@ -40,6 +40,9 @@ async function buscarSegmento(ctx) {
   const cont = document.getElementById("resultado-segmento");
   cont.innerHTML = `<div class="mensaje-vacio">Buscando…</div>`;
 
+  const sucursalesSnap = await getDocs(collection(db, "sucursales"));
+  const mapaSucursales = Object.fromEntries(sucursalesSnap.docs.map((d) => [d.data().sucursalId, d.data().nombre]));
+
   let q = collection(db, "clientes");
   const condiciones = [];
   if (sucursalId) condiciones.push(where("sucursalPreferida", "==", sucursalId));
@@ -71,7 +74,7 @@ async function buscarSegmento(ctx) {
         <thead><tr><th>Nombre</th><th>Teléfono</th><th>Sucursal</th><th>Registro</th></tr></thead>
         <tbody>
           ${clientes.slice(0, 200).map((c) => `
-            <tr><td>${escapeHtml(c.nombre || "—")}</td><td>${escapeHtml(c.telefono || "—")}</td><td>${escapeHtml(c.sucursalPreferida || "—")}</td><td>${formatearFecha(c.fechaRegistro)}</td></tr>`).join("")}
+            <tr><td>${escapeHtml(c.nombre || "—")}</td><td>${escapeHtml(c.telefono || "—")}</td><td>${escapeHtml(mapaSucursales[c.sucursalPreferida] || "—")}</td><td>${formatearFecha(c.fechaRegistro)}</td></tr>`).join("")}
         </tbody>
       </table>
     </div>`;
