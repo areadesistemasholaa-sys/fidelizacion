@@ -1,6 +1,7 @@
 import { db } from "/shared/firebase-config.js";
 import { collection, getDocs, orderBy, query, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { duplicarCampana as opDuplicarCampana, cambiarEstadoCampana as opCambiarEstadoCampana, actualizarCampana as opActualizarCampana, crearCampana as opCrearCampana, guardarPregunta as opGuardarPregunta } from "/shared/firestore-ops.js";
+import { etiquetaTipoBeneficio, resumenBeneficio } from "./beneficios.js";
 import { escapeHtml, formatearFecha, badgeEstadoCampana, mostrarToast } from "./utils.js";
 import { puedeGestionarCampanas } from "./menu.js";
 
@@ -36,8 +37,12 @@ export async function renderCampanas(el, ctx) {
 
 async function cargarLista(ctx) {
   const cont = document.getElementById("lista-campanas");
-  const snap = await getDocs(collection(db, "campanas"));
+  const [snap, beneficiosSnap] = await Promise.all([
+    getDocs(collection(db, "campanas")),
+    getDocs(collection(db, "beneficios")),
+  ]);
   const campanas = snap.docs.map((d) => d.data()).sort((a, b) => (b.fechaCreacion?.seconds || 0) - (a.fechaCreacion?.seconds || 0));
+  const mapaBeneficios = Object.fromEntries(beneficiosSnap.docs.map((d) => [d.data().beneficioId, d.data()]));
 
   if (campanas.length === 0) {
     cont.innerHTML = `<div class="mensaje-vacio"><div class="icono">🎯</div>Aún no hay campañas. Crea la primera — por ejemplo, "Regreso a Clases".</div>`;
@@ -47,12 +52,13 @@ async function cargarLista(ctx) {
   const gestiona = puedeGestionarCampanas(ctx.rol);
   cont.innerHTML = `
     <table>
-      <thead><tr><th>Campaña</th><th>Estado</th><th>Vigencia</th><th>Versión</th>${gestiona ? "<th>Acciones</th>" : ""}</tr></thead>
+      <thead><tr><th>Campaña</th><th>Estado</th><th>Beneficio</th><th>Vigencia</th><th>Versión</th>${gestiona ? "<th>Acciones</th>" : ""}</tr></thead>
       <tbody>
         ${campanas.map((c) => `
           <tr>
             <td><strong>${escapeHtml(c.nombre)}</strong></td>
             <td>${badgeEstadoCampana(c.estado)}</td>
+            <td>${c.beneficioId && mapaBeneficios[c.beneficioId] ? escapeHtml(mapaBeneficios[c.beneficioId].nombre) : "—"}</td>
             <td>${formatearFecha(c.fechaInicio)} — ${formatearFecha(c.fechaFin)}</td>
             <td>v${c.version || 1}</td>
             ${gestiona ? `<td class="tabla-acciones">
@@ -72,8 +78,8 @@ async function cargarLista(ctx) {
 
 function accionesEstado(c) {
   const acciones = {
-    borrador: [["activar", "Activar"], ["programada_o_activa", "Programar"]],
-    programada: [["activar", "Activar"], ["pausada", "Pausar"]],
+    borrador: [["activa", "Activar"], ["programada", "Programar"]],
+    programada: [["activa", "Activar"], ["pausada", "Pausar"]],
     activa: [["pausada", "Pausar"], ["finalizada", "Finalizar"]],
     pausada: [["activa", "Reanudar"], ["finalizada", "Finalizar"]],
     finalizada: [["archivada", "Archivar"]],
@@ -114,12 +120,18 @@ async function manejarAccion(accion, campanaId, ctx) {
 // Modal: crear/editar campaña (general, tema, beneficio)
 // -------------------------------------------------------------------
 async function abrirModalCampana(campanaId, ctx) {
-  let campana = { nombre: "", descripcion: "", mensajeBienvenida: "", mensajeFinal: "", fechaInicio: "", fechaFin: "", tema: {} };
+  let campana = { nombre: "", descripcion: "", mensajeBienvenida: "", mensajeFinal: "", fechaInicio: "", fechaFin: "", beneficioId: null, tema: {} };
   if (campanaId) {
     const snap = await getDoc(doc(db, "campanas", campanaId));
     campana = snap.data();
   }
   const tema = { colorPrimario: "#C20152", colorSecundario: "#000000", colorFondo: "#FFFFFF", tipografia: "Poppins", icono: "🛍️", estiloTarjeta: "redondeado", ...(campana.tema || {}) };
+
+  // Catálogo de beneficios (Sección 6bis): el admin elige aquí QUÉ
+  // descuento/promoción se le entregará al cliente al terminar la
+  // encuesta; con eso, enviarEncuesta() genera el código de barras.
+  const beneficiosSnap = await getDocs(query(collection(db, "beneficios"), orderBy("fechaCreacion", "desc")));
+  const beneficios = beneficiosSnap.docs.map((d) => d.data());
 
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
@@ -128,6 +140,7 @@ async function abrirModalCampana(campanaId, ctx) {
       <h2>${campanaId ? "Editar campaña" : "Nueva campaña"}</h2>
       <div class="modal-tabs">
         <button class="modal-tab activo" data-tab="general">General</button>
+        <button class="modal-tab" data-tab="beneficio">Beneficio</button>
         <button class="modal-tab" data-tab="tema">Apariencia</button>
         <button class="modal-tab" data-tab="mensajes">Mensajes</button>
       </div>
@@ -139,6 +152,21 @@ async function abrirModalCampana(campanaId, ctx) {
           <div class="campo-grupo"><label>Fecha de inicio</label><input type="date" id="c-inicio" value="${valorFecha(campana.fechaInicio)}" /></div>
           <div class="campo-grupo"><label>Fecha de fin</label><input type="date" id="c-fin" value="${valorFecha(campana.fechaFin)}" /></div>
         </div>
+      </div>
+      <div id="tab-beneficio" hidden>
+        <div class="campo-grupo">
+          <label>Beneficio que recibirá el cliente</label>
+          <select id="c-beneficio">
+            <option value="">Sin beneficio (solo encuesta, sin código)</option>
+            ${beneficios.map((b) => `<option value="${b.beneficioId}" ${campana.beneficioId === b.beneficioId ? "selected" : ""}>${escapeHtml(b.nombre)} — ${escapeHtml(resumenBeneficio(b))}${b.activo === false ? " (inactivo)" : ""}</option>`).join("")}
+          </select>
+        </div>
+        <p id="beneficio-preview" class="subtexto" style="font-size:0.82rem"></p>
+        <div class="campo-grupo">
+          <label>Vigencia del código (horas desde que se genera)</label>
+          <input type="number" id="c-vigencia" min="1" value="${campana.vigenciaCodigoHoras || 72}" />
+        </div>
+        <p style="font-size:0.78rem;color:var(--holaa-gris-texto)">Al terminar la encuesta, se genera automáticamente un código de barras de un solo uso con el beneficio elegido aquí. ¿No existe el beneficio que necesitas? Créalo primero en el módulo <strong>Beneficios</strong>.</p>
       </div>
       <div id="tab-tema" hidden>
         <div class="campo-fila-2">
@@ -174,9 +202,20 @@ async function abrirModalCampana(campanaId, ctx) {
     tab.onclick = () => {
       overlay.querySelectorAll(".modal-tab").forEach((t) => t.classList.remove("activo"));
       tab.classList.add("activo");
-      ["general", "tema", "mensajes"].forEach((n) => { overlay.querySelector(`#tab-${n}`).hidden = n !== tab.dataset.tab; });
+      ["general", "beneficio", "tema", "mensajes"].forEach((n) => { overlay.querySelector(`#tab-${n}`).hidden = n !== tab.dataset.tab; });
     };
   });
+
+  const selBeneficio = overlay.querySelector("#c-beneficio");
+  const previewBeneficio = overlay.querySelector("#beneficio-preview");
+  function pintarPreviewBeneficio() {
+    const elegido = beneficios.find((b) => b.beneficioId === selBeneficio.value);
+    previewBeneficio.textContent = elegido
+      ? `El cliente verá: "${elegido.descripcionCliente || elegido.nombre}"`
+      : "El cliente no recibirá ningún código al terminar la encuesta.";
+  }
+  selBeneficio.onchange = pintarPreviewBeneficio;
+  pintarPreviewBeneficio();
 
   overlay.querySelector("#btn-cerrar-modal").onclick = () => overlay.remove();
   overlay.querySelector("#btn-guardar-campana").onclick = async () => {
@@ -188,6 +227,8 @@ async function abrirModalCampana(campanaId, ctx) {
       fechaFin: overlay.querySelector("#c-fin").value || null,
       mensajeBienvenida: overlay.querySelector("#c-bienvenida").value.trim(),
       mensajeFinal: overlay.querySelector("#c-final").value.trim(),
+      beneficioId: selBeneficio.value || null,
+      vigenciaCodigoHoras: Number(overlay.querySelector("#c-vigencia").value) || 72,
       tema: {
         colorPrimario: overlay.querySelector("#t-primario").value,
         colorSecundario: overlay.querySelector("#t-secundario").value,

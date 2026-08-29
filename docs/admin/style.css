@@ -88,6 +88,8 @@ tr:last-child td { border-bottom: none; }
 .badge-usado { background: #E6F6EC; color: #1B8A45; }
 .badge-expirado { background: #FCEBEC; color: #C41E3A; }
 .badge-cancelado { background: #F0F0F0; color: #666; }
+.badge-activo { background: #E6F6EC; color: #1B8A45; }
+.badge-inactivo { background: #F0F0F0; color: #666; }
 
 .tabla-acciones { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .tabla-acciones button { font-size: 0.78rem; padding: 0.35em 0.7em; border-radius: 8px; border: 1px solid #E5E5E5; background: white; }
