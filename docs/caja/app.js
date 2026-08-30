@@ -141,12 +141,17 @@ function renderPantallaEscaneo(dispositivoId, sucursalNombre, sucursalId) {
       <span class="caja-sucursal">📍 ${escapeHtml(sucursalNombre)}</span>
       <button id="btn-reconfigurar" style="background:none;border:none;color:var(--holaa-gris-texto);font-size:0.8rem;text-decoration:underline">Cambiar sucursal</button>
     </div>
+    <div class="caja-modo-tabs">
+      <button class="caja-modo-btn activo" id="btn-modo-fisico" type="button">🔌 Lector físico</button>
+      <button class="caja-modo-btn" id="btn-modo-camara" type="button">📷 Cámara</button>
+    </div>
     <div class="caja-centro">
-      <div class="caja-icono-espera">🛒</div>
-      <div class="caja-instruccion">Usa el escáner para leer el código del cupón del cliente</div>
+      <div id="vista-fisico">
+        <div class="caja-icono-espera">🛒</div>
+        <div class="caja-instruccion">Usa el escáner para leer el código del cupón del cliente</div>
+      </div>
+      <div id="lector-camara" style="display:none;width:100%;max-width:340px;border-radius:var(--radio-tarjeta);overflow:hidden"></div>
       <input type="text" id="input-scan" autofocus autocomplete="off" />
-      <button class="btn btn-secundario" id="btn-camara" style="margin-top:0.85rem">Escanear con la cámara del celular</button>
-      <div id="lector-camara" style="display:none;width:100%;max-width:340px;margin:0.85rem auto 0;border-radius:var(--radio-tarjeta);overflow:hidden"></div>
     </div>
     <div class="caja-historial" id="caja-registros"></div>
     <div class="caja-historial" id="caja-historial"></div>`;
@@ -154,7 +159,7 @@ function renderPantallaEscaneo(dispositivoId, sucursalNombre, sucursalId) {
   document.getElementById("btn-reconfigurar").onclick = () => {
     if (confirm("¿Cambiar la sucursal de esta terminal? Se pedirá volver a configurarla.")) {
       if (unsubscribeRegistros) { unsubscribeRegistros(); unsubscribeRegistros = null; }
-      detenerEscaneoCamara(dispositivoId, sucursalNombre, sucursalId, false);
+      detenerEscaneoCamara();
       localStorage.removeItem(LS_KEY);
       localStorage.removeItem(LS_SUCURSAL_NOMBRE);
       localStorage.removeItem(LS_SUCURSAL_ID);
@@ -163,6 +168,27 @@ function renderPantallaEscaneo(dispositivoId, sucursalNombre, sucursalId) {
   };
 
   const inputScan = document.getElementById("input-scan");
+  const btnFisico = document.getElementById("btn-modo-fisico");
+  const btnCamara = document.getElementById("btn-modo-camara");
+  const vistaFisico = document.getElementById("vista-fisico");
+  const vistaCamara = document.getElementById("lector-camara");
+
+  btnFisico.onclick = () => {
+    btnFisico.classList.add("activo");
+    btnCamara.classList.remove("activo");
+    vistaFisico.style.display = "block";
+    vistaCamara.style.display = "none";
+    detenerEscaneoCamara();
+    mantenerFoco(inputScan);
+  };
+  btnCamara.onclick = () => {
+    btnCamara.classList.add("activo");
+    btnFisico.classList.remove("activo");
+    vistaFisico.style.display = "none";
+    vistaCamara.style.display = "block";
+    iniciarEscaneoCamara(dispositivoId, sucursalNombre, sucursalId);
+  };
+
   mantenerFoco(inputScan);
 
   let buffer = "";
@@ -175,17 +201,16 @@ function renderPantallaEscaneo(dispositivoId, sucursalNombre, sucursalId) {
   });
   inputScan.addEventListener("input", () => { buffer = inputScan.value; });
 
-  document.getElementById("btn-camara").onclick = () => iniciarEscaneoCamara(dispositivoId, sucursalNombre, sucursalId);
-
   pintarHistorial(dispositivoId);
   escucharRegistros(sucursalId);
 }
 
 // -------------------------------------------------------------------
-// Sección 20.2 (nuevo) — Escaneo con la cámara del celular. Además del
-// lector físico (que actúa como teclado + Enter sobre #input-scan),
-// esto permite usar la cámara de cualquier celular como escáner,
-// usando la librería html5-qrcode (lee CODE128 y también QR).
+// Sección 20.2 (nuevo) — Escaneo con la cámara del celular, como
+// alternativa al lector físico (que sigue siendo el modo por default,
+// ya que #input-scan siempre está escuchando en segundo plano). La
+// pestaña "Cámara" usa html5-qrcode para leer CODE128 (y QR) con la
+// cámara trasera del dispositivo.
 // -------------------------------------------------------------------
 let scannerCamara = null;
 
@@ -194,42 +219,27 @@ function iniciarEscaneoCamara(dispositivoId, sucursalNombre, sucursalId) {
     window.alert("No se pudo cargar el lector de cámara. Revisa tu conexión a internet e intenta de nuevo.");
     return;
   }
-  const cont = document.getElementById("lector-camara");
-  const btn = document.getElementById("btn-camara");
-  cont.style.display = "block";
-  btn.textContent = "Detener cámara";
-  btn.onclick = () => detenerEscaneoCamara(dispositivoId, sucursalNombre, sucursalId);
-
   scannerCamara = new Html5Qrcode("lector-camara");
   scannerCamara
     .start(
       { facingMode: "environment" },
       { fps: 10, qrbox: { width: 260, height: 160 } },
       (textoDecodificado) => {
-        detenerEscaneoCamara(dispositivoId, sucursalNombre, sucursalId, false);
+        detenerEscaneoCamara();
         if (textoDecodificado.trim()) validar(textoDecodificado.trim(), dispositivoId, sucursalNombre, sucursalId);
       },
       () => {} // fallos de lectura cuadro-a-cuadro mientras busca el código; normal, se ignoran
     )
     .catch(() => {
       window.alert("No pudimos acceder a la cámara. Revisa que el navegador tenga permiso de cámara para este sitio.");
-      detenerEscaneoCamara(dispositivoId, sucursalNombre, sucursalId, false);
     });
 }
 
-function detenerEscaneoCamara(dispositivoId, sucursalNombre, sucursalId, restaurarBoton = true) {
-  const cont = document.getElementById("lector-camara");
-  const btn = document.getElementById("btn-camara");
-  if (scannerCamara) {
-    const s = scannerCamara;
-    scannerCamara = null;
-    s.stop().then(() => s.clear()).catch(() => {});
-  }
-  if (cont) cont.style.display = "none";
-  if (btn && restaurarBoton) {
-    btn.textContent = "Escanear con la cámara del celular";
-    btn.onclick = () => iniciarEscaneoCamara(dispositivoId, sucursalNombre, sucursalId);
-  }
+function detenerEscaneoCamara() {
+  if (!scannerCamara) return;
+  const s = scannerCamara;
+  scannerCamara = null;
+  s.stop().then(() => s.clear()).catch(() => {});
 }
 
 // -------------------------------------------------------------------
@@ -343,7 +353,7 @@ function mantenerFoco(el) {
 async function validar(codigoBarras, dispositivoId, sucursalNombre, sucursalId) {
   if (bloqueadoEnvio) return;
   bloqueadoEnvio = true;
-  if (scannerCamara) detenerEscaneoCamara(dispositivoId, sucursalNombre, sucursalId, false);
+  if (scannerCamara) detenerEscaneoCamara();
 
   mostrarResultado("cargando", "Verificando…", "");
 
