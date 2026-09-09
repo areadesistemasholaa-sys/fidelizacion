@@ -1,0 +1,124 @@
+rules_version = '2';
+
+// ===================================================================
+// HOLAA Trendy — Reglas de seguridad de Firestore
+// ===================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    function perfilAdmin() {
+      return get(/databases/$(database)/documents/administradores/$(request.auth.uid)).data;
+    }
+
+    function esAdminActivo() {
+      return autenticado()
+        && exists(/databases/$(database)/documents/administradores/$(request.auth.uid))
+        && perfilAdmin().estado == 'activo';
+    }
+
+    function tieneRol(roles) {
+      return esAdminActivo() && perfilAdmin().rol in roles;
+    }
+
+    function pinValido(sucursalId, intento) {
+      let cfgPath = /databases/$(database)/documents/sucursales/$(sucursalId)/privado/config;
+      let cfg = exists(cfgPath) ? get(cfgPath).data : { pinConfiguracion: null };
+      return cfg.pinConfiguracion == null || cfg.pinConfiguracion == intento;
+    }
+
+    match /administradores/{adminId} {
+      allow get: if autenticado() && (request.auth.uid == adminId || tieneRol(['superadmin']));
+      allow list: if tieneRol(['superadmin']);
+      allow create, update: if tieneRol(['superadmin']);
+      allow delete: if false;
+    }
+
+    match /auditoria/{id} {
+      allow get, list: if tieneRol(['superadmin', 'admin']);
+      allow create: if autenticado() && request.resource.data.usuarioUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /campanas/{campanaId} {
+      allow get, list: if (resource.data.estado == 'activa') || tieneRol(['superadmin', 'admin', 'marketing', 'consulta']);
+      allow create, update, delete: if tieneRol(['superadmin', 'admin', 'marketing']);
+
+      match /preguntas/{preguntaId} {
+        allow get, list: if (get(/databases/$(database)/documents/campanas/$(campanaId)).data.estado == 'activa')
+          || tieneRol(['superadmin', 'admin', 'marketing', 'consulta']);
+        allow write: if tieneRol(['superadmin', 'admin', 'marketing']);
+      }
+    }
+
+    match /beneficios/{beneficioId} {
+      allow get: if autenticado();
+      allow list: if tieneRol(['superadmin', 'admin', 'marketing', 'analitica', 'consulta']);
+      allow create, update: if tieneRol(['superadmin', 'admin', 'marketing']);
+      allow delete: if false;
+    }
+
+    match /clientes/{clienteId} {
+      allow get: if autenticado() && (request.auth.uid == clienteId || tieneRol(['superadmin', 'admin', 'marketing', 'analitica', 'consulta']));
+      allow list: if tieneRol(['superadmin', 'admin', 'marketing', 'analitica', 'consulta']);
+      allow create, update: if autenticado() && request.auth.uid == clienteId;
+      allow delete: if false;
+    }
+
+    match /respuestas/{respuestaId} {
+      allow get, list: if tieneRol(['superadmin', 'admin', 'marketing', 'analitica', 'consulta']);
+      allow create: if autenticado() && request.resource.data.clienteId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /consentimientos/{id} {
+      allow get, list: if tieneRol(['superadmin', 'admin', 'consulta']);
+      allow create: if autenticado() && request.resource.data.clienteId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /beneficiosAsignados/{id} {
+      allow get, list: if autenticado();
+      allow create: if autenticado()
+        && request.resource.data.clienteId == request.auth.uid
+        && request.resource.data.estadoUso == 'pendiente';
+      allow update: if autenticado()
+        && resource.data.estadoUso == 'pendiente'
+        && request.resource.data.estadoUso == 'usado'
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['estadoUso', 'dispositivoIdValidacion', 'validadoPor', 'fechaHoraValidacion']);
+      allow delete: if false;
+    }
+
+    match /sucursales/{sucursalId} {
+      allow get, list: if true;
+      allow create, update: if tieneRol(['superadmin', 'admin']);
+      allow delete: if false;
+
+      match /privado/{docId} {
+        allow get, list: if tieneRol(['superadmin', 'admin']);
+        allow write: if tieneRol(['superadmin', 'admin']);
+      }
+    }
+
+    match /dispositivosCaja/{dispositivoId} {
+      allow get: if autenticado();
+      allow list: if tieneRol(['superadmin', 'admin']);
+      allow create: if autenticado()
+        && request.resource.data.configuradoPor == request.auth.uid
+        && request.resource.data.estado == 'activo'
+        && pinValido(request.resource.data.sucursalId, request.resource.data.pinIntento);
+      allow update: if tieneRol(['superadmin', 'admin']);
+      allow delete: if false;
+    }
+
+    match /bibliotecaPreguntas/{id} {
+      allow get, list: if tieneRol(['superadmin', 'admin', 'marketing']);
+      allow create: if tieneRol(['superadmin']);
+      allow update, delete: if false;
+    }
+  }
+}
