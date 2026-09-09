@@ -66,10 +66,13 @@ function formatearHora(iso) {
 init();
 
 async function init() {
-  await new Promise((resolve) => onAuthStateChanged(auth, async (u) => {
-    if (!u) await signInAnonymously(auth);
-    resolve();
-  }));
+  await new Promise((resolve) => {
+    const dejarDeEscuchar = onAuthStateChanged(auth, async (u) => {
+      dejarDeEscuchar();
+      if (!u) await signInAnonymously(auth);
+      resolve();
+    });
+  });
 
   const dispositivoId = localStorage.getItem(LS_KEY);
   if (!dispositivoId) {
