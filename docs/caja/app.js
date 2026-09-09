@@ -288,7 +288,8 @@ function escucharRegistros(sucursalId) {
             </div>`;
         }).join("")}
       </div>`;
-  }, () => {
+  }, (err) => {
+    console.error("Error cargando registros de la sucursal:", err);
     cont.innerHTML = `
       <div class="caja-historial-encabezado"><h2>Registros de esta sucursal</h2></div>
       <div class="caja-historial-vacio">No pudimos cargar los registros en vivo.</div>`;
