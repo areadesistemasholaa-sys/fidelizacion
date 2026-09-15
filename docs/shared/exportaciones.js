@@ -62,6 +62,56 @@ function aplicarBandasYBordes(hoja, primeraFilaDatos) {
   });
 }
 
+// Firestore limita las consultas "in" a 10 valores por lote, así que
+// se arma el mapa clienteId -> nombre en tandas de 10.
+async function obtenerMapaClientes(clienteIds) {
+  const idsUnicos = [...new Set(clienteIds.filter(Boolean))];
+  const mapa = {};
+  const TAMANIO_LOTE = 10;
+  for (let i = 0; i < idsUnicos.length; i += TAMANIO_LOTE) {
+    const lote = idsUnicos.slice(i, i + TAMANIO_LOTE);
+    const q = query(collection(db, "clientes"), where("clienteId", "in", lote));
+    const snap = await getDocs(q);
+    snap.forEach((d) => {
+      const c = d.data();
+      mapa[c.clienteId] = c.nombre || "";
+    });
+  }
+  return mapa;
+}
+
+// Igual que obtenerMapaClientes, pero para resolver sucursalId -> nombre.
+async function obtenerMapaSucursales(sucursalIds) {
+  const idsUnicos = [...new Set(sucursalIds.filter(Boolean))];
+  const mapa = {};
+  const TAMANIO_LOTE = 10;
+  for (let i = 0; i < idsUnicos.length; i += TAMANIO_LOTE) {
+    const lote = idsUnicos.slice(i, i + TAMANIO_LOTE);
+    const q = query(collection(db, "sucursales"), where("sucursalId", "in", lote));
+    const snap = await getDocs(q);
+    snap.forEach((d) => {
+      const s = d.data();
+      mapa[s.sucursalId] = s.nombre || "";
+    });
+  }
+  return mapa;
+}
+
+// Las preguntas viven en la subcolección campanas/{campanaId}/preguntas.
+// Se arma un mapa preguntaId -> { texto, orden } por cada campaña involucrada.
+async function obtenerMapaPreguntas(campanaIds) {
+  const idsUnicos = [...new Set(campanaIds.filter(Boolean))];
+  const mapa = {};
+  for (const campanaId of idsUnicos) {
+    const snap = await getDocs(collection(db, "campanas", campanaId, "preguntas"));
+    snap.forEach((d) => {
+      const p = d.data();
+      mapa[p.preguntaId || d.id] = { texto: p.texto || d.id, orden: p.orden ?? Infinity };
+    });
+  }
+  return mapa;
+}
+
 async function guardarBlob(libro, nombreArchivo) {
   const buffer = await libro.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
@@ -157,27 +207,58 @@ export async function exportarRespuestas({ campanaId } = {}) {
   if (campanaId) q = query(q, where("campanaId", "==", campanaId));
   const snap = await getDocs(q);
 
+  const idsSucursales = [];
+  const idsCampanas = [];
+  snap.docs.forEach((d) => {
+    const r = d.data();
+    if (r.sucursalId) idsSucursales.push(r.sucursalId);
+    if (r.respuestas?.sucursal_sistema) idsSucursales.push(r.respuestas.sucursal_sistema);
+    if (r.campanaId) idsCampanas.push(r.campanaId);
+  });
+
+  const mapaClientes = await obtenerMapaClientes(snap.docs.map((d) => d.data().clienteId));
+  const mapaSucursales = await obtenerMapaSucursales(idsSucursales);
+  const mapaPreguntas = await obtenerMapaPreguntas(idsCampanas);
+
   const preguntasSet = new Set();
   const filas = snap.docs.map((d) => {
     const r = d.data();
     const respuestas = {};
+    let sucursalSistemaId = "";
     Object.entries(r.respuestas || {}).forEach(([preguntaId, valor]) => {
+      // "sucursal_sistema" no es una pregunta de la encuesta: es la sucursal
+      // donde se contestó (según el dispositivo/caja), se resuelve aparte.
+      if (preguntaId === "sucursal_sistema") {
+        sucursalSistemaId = valor;
+        return;
+      }
       preguntasSet.add(preguntaId);
       respuestas[preguntaId] = Array.isArray(valor) ? valor.join(", ") : valor;
     });
     return {
-      clienteId: r.clienteId, campanaId: r.campanaId, versionCampana: r.versionCampana,
-      sucursalId: r.sucursalId, fecha: fechaCelda(r.fecha), ...respuestas,
+      clienteId: r.clienteId, nombre: mapaClientes[r.clienteId] || "", campanaId: r.campanaId, versionCampana: r.versionCampana,
+      sucursalId: r.sucursalId, sucursalNombre: mapaSucursales[r.sucursalId] || r.sucursalId,
+      sucursalSistemaNombre: mapaSucursales[sucursalSistemaId] || sucursalSistemaId,
+      fecha: fechaCelda(r.fecha), ...respuestas,
     };
+  });
+
+  const preguntasOrdenadas = [...preguntasSet].sort((a, b) => {
+    const ordenA = mapaPreguntas[a]?.orden ?? Infinity;
+    const ordenB = mapaPreguntas[b]?.orden ?? Infinity;
+    return ordenA - ordenB;
   });
 
   const columnas = [
     { header: "Cliente ID", key: "clienteId", width: 14 },
+    { header: "Nombre", key: "nombre", width: 24 },
     { header: "Campaña ID", key: "campanaId", width: 16 },
     { header: "Versión encuesta", key: "versionCampana", width: 16 },
-    { header: "Sucursal", key: "sucursalId", width: 12 },
+    { header: "Sucursal ID", key: "sucursalId", width: 12 },
+    { header: "Sucursal", key: "sucursalNombre", width: 22 },
+    { header: "Sucursal (dispositivo)", key: "sucursalSistemaNombre", width: 22 },
     { header: "Fecha", key: "fecha", width: 18, esFecha: true },
-    ...[...preguntasSet].map((p) => ({ header: p, key: p })),
+    ...preguntasOrdenadas.map((p) => ({ header: mapaPreguntas[p]?.texto || p, key: p, width: 30 })),
   ];
 
   await descargarTabla({ nombreHoja: "Respuestas", columnas, filas, nombreArchivo: `respuestas_${campanaId || "todas"}_${Date.now()}.xlsx` });
