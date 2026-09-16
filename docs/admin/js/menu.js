@@ -23,6 +23,13 @@ export function puedeExportar(rol) {
   return ["superadmin", "admin", "marketing", "analitica"].includes(rol);
 }
 
+// Desactivar/reactivar/eliminar clientes desde el panel es una
+// acción sensible sobre datos personales: se restringe a los mismos
+// roles que administran el sistema, no a marketing/analítica/consulta.
+export function puedeEliminarClientes(rol) {
+  return ["superadmin", "admin"].includes(rol);
+}
+
 export function puedeGestionarCampanas(rol) {
   return ["superadmin", "admin", "marketing"].includes(rol);
 }

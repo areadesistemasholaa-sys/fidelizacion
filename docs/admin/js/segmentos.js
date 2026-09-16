@@ -2,7 +2,8 @@ import { db } from "/shared/firebase-config.js";
 import { collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { escapeHtml, formatearFecha, mostrarToast } from "./utils.js";
 import { exportarSegmento } from "/shared/exportaciones.js";
-import { puedeExportar } from "./menu.js";
+import { contarClientes, cambiarEstadoCliente, eliminarCliente } from "/shared/firestore-ops.js";
+import { puedeExportar, puedeEliminarClientes } from "./menu.js";
 
 const UMBRAL_FRECUENCIA_DEFECTO = 2;
 
@@ -99,6 +100,7 @@ async function buscarSegmento(ctx) {
 
   const sucursalesSnap = await getDocs(collection(db, "sucursales"));
   const mapaSucursales = Object.fromEntries(sucursalesSnap.docs.map((d) => [d.data().sucursalId, d.data().nombre]));
+  const totalClientes = await contarClientes();
 
   let q = collection(db, "clientes");
   const condiciones = [];
@@ -139,26 +141,60 @@ async function buscarSegmento(ctx) {
     return;
   }
 
+  const puedeEliminar = puedeEliminarClientes(ctx.rol);
+
   cont.innerHTML = `
     <div class="tabla-wrap">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1rem 0">
         <strong>${clientes.length} clientes en este segmento</strong>
+        <span style="color:var(--holaa-gris-texto);font-size:0.82rem">de ${totalClientes} en total</span>
         ${puedeExportar(ctx.rol) ? `<button class="btn btn-secundario" id="btn-exportar-segmento">Exportar a Excel</button>` : ""}
       </div>
       <table>
-        <thead><tr><th>Nombre</th><th>Teléfono</th><th>Sucursal</th><th>Registro</th>${necesitaActividad ? "<th>Visitas</th><th>Sucursales visitadas</th>" : ""}</tr></thead>
+        <thead><tr><th>Nombre</th><th>Teléfono</th><th>Sucursal</th><th>Estado</th><th>Registro</th>${necesitaActividad ? "<th>Visitas</th><th>Sucursales visitadas</th>" : ""}${puedeEliminar ? "<th>Acciones</th>" : ""}</tr></thead>
         <tbody>
           ${clientes.slice(0, 200).map((c) => {
             const act = necesitaActividad ? mapaActividad[c.clienteId] : null;
             return `
-            <tr>
-              <td>${escapeHtml(c.nombre || "—")}</td><td>${escapeHtml(c.telefono || "—")}</td><td>${escapeHtml(mapaSucursales[c.sucursalPreferida] || "—")}</td><td>${formatearFecha(c.fechaRegistro)}</td>
+            <tr data-cliente-id="${escapeHtml(c.clienteId)}">
+              <td>${escapeHtml(c.nombre || "—")}</td><td>${escapeHtml(c.telefono || "—")}</td><td>${escapeHtml(mapaSucursales[c.sucursalPreferida] || "—")}</td><td>${c.estado === "inactivo" ? "Inactivo" : "Activo"}</td><td>${formatearFecha(c.fechaRegistro)}</td>
               ${necesitaActividad ? `<td>${act?.visitas || 0}</td><td>${act?.sucursales?.size || 0}</td>` : ""}
+              ${puedeEliminar ? `
+                <td style="white-space:nowrap">
+                  <button class="btn btn-secundario btn-toggle-estado" data-id="${escapeHtml(c.clienteId)}" data-estado-actual="${c.estado === "inactivo" ? "inactivo" : "activo"}" style="padding:0.3rem 0.6rem;font-size:0.75rem">${c.estado === "inactivo" ? "Reactivar" : "Marcar inactivo"}</button>
+                  <button class="btn btn-peligro btn-eliminar-cliente" data-id="${escapeHtml(c.clienteId)}" data-nombre="${escapeHtml(c.nombre || c.clienteId)}" style="padding:0.3rem 0.6rem;font-size:0.75rem">Eliminar</button>
+                </td>` : ""}
             </tr>`; }).join("")}
         </tbody>
       </table>
       ${clientes.length > 200 ? `<p style="padding:0.75rem 1rem;color:var(--holaa-gris-texto);font-size:0.78rem;margin:0">Mostrando los primeros 200. Usa "Exportar a Excel" para el segmento completo.</p>` : ""}
     </div>`;
+
+  if (puedeEliminar) {
+    cont.querySelectorAll(".btn-toggle-estado").forEach((btn) => {
+      btn.onclick = async () => {
+        const nuevoEstado = btn.dataset.estadoActual === "inactivo" ? "activo" : "inactivo";
+        if (nuevoEstado === "inactivo" && !confirm("¿Marcar este cliente como inactivo? Podrás reactivarlo cuando quieras; no se borra su historial.")) return;
+        btn.disabled = true;
+        try {
+          await cambiarEstadoCliente({ clienteId: btn.dataset.id, nuevoEstado });
+          mostrarToast(nuevoEstado === "inactivo" ? "Cliente marcado como inactivo." : "Cliente reactivado.", "exito");
+          await buscarSegmento(ctx);
+        } catch (e) { mostrarToast(e.message, "error"); btn.disabled = false; }
+      };
+    });
+    cont.querySelectorAll(".btn-eliminar-cliente").forEach((btn) => {
+      btn.onclick = async () => {
+        if (!confirm(`¿Eliminar PERMANENTEMENTE a "${btn.dataset.nombre}"? Esta acción no se puede deshacer. Sus respuestas y beneficios históricos quedarán registrados, pero ya no podrás ver ni exportar su ficha de cliente.`)) return;
+        btn.disabled = true;
+        try {
+          await eliminarCliente({ clienteId: btn.dataset.id });
+          mostrarToast("Cliente eliminado.", "exito");
+          await buscarSegmento(ctx);
+        } catch (e) { mostrarToast(e.message, "error"); btn.disabled = false; }
+      };
+    });
+  }
 
   const btnExportar = document.getElementById("btn-exportar-segmento");
   if (btnExportar) {
