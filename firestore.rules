@@ -64,8 +64,18 @@ service cloud.firestore {
     match /clientes/{clienteId} {
       allow get: if autenticado() && (request.auth.uid == clienteId || tieneRol(['superadmin', 'admin', 'marketing', 'analitica', 'consulta']));
       allow list: if tieneRol(['superadmin', 'admin', 'marketing', 'analitica', 'consulta']);
-      allow create, update: if autenticado() && request.auth.uid == clienteId;
-      allow delete: if false;
+      allow create: if autenticado() && request.auth.uid == clienteId;
+      // El propio cliente puede actualizar su registro completo
+      // (autoservicio en la encuesta). Un administrador (superadmin/
+      // admin) solo puede tocar estado/fechaActualizacion — activar o
+      // desactivar al cliente desde el panel — nunca reescribir sus
+      // demás datos.
+      allow update: if autenticado() && (
+        request.auth.uid == clienteId
+        || (tieneRol(['superadmin', 'admin'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'fechaActualizacion']))
+      );
+      allow delete: if tieneRol(['superadmin', 'admin']);
     }
 
     match /respuestas/{respuestaId} {
