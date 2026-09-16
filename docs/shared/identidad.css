@@ -80,6 +80,14 @@ button {
   border: 1.5px solid var(--color-primario);
 }
 
+.btn-peligro {
+  background: transparent;
+  color: #C0392B;
+  border: 1.5px solid #C0392B;
+}
+.btn-peligro:hover { background: #C0392B; color: var(--holaa-blanco); }
+.btn-peligro:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .tarjeta {
   background: var(--holaa-blanco);
   border-radius: var(--radio-tarjeta);

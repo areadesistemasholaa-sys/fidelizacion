@@ -36,6 +36,7 @@ import {
   limit,
   runTransaction,
   serverTimestamp,
+  getCountFromServer,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ===================================================================
@@ -528,6 +529,39 @@ export async function desactivarAdministrador({ uid }) {
   // escribir nada del sistema.
   await updateDoc(doc(db, "administradores", uid), { estado: "inactivo" });
   await registrarAuditoria({ accion: "desactivar_administrador", modulo: "administradores", detalle: { uid } });
+}
+
+// ===================================================================
+// CLIENTES — gestión desde el Panel Admin (Clientes y Segmentos).
+// El registro/autoservicio del cliente sigue viviendo en
+// enviarEncuesta(); esto es lo que un administrador puede hacer
+// sobre un cliente ya existente: contar el total, desactivarlo o
+// reactivarlo (reversible, no se pierde su historial de respuestas
+// ni beneficios), o eliminarlo por completo (permanente).
+// ===================================================================
+export async function contarClientes() {
+  const snap = await getCountFromServer(collection(db, "clientes"));
+  return snap.data().count;
+}
+
+export async function cambiarEstadoCliente({ clienteId, nuevoEstado }) {
+  if (!["activo", "inactivo"].includes(nuevoEstado)) throw new Error("Estado no válido.");
+  // firestore.rules exige que esta actualización, cuando la hace un
+  // administrador (no el propio cliente), solo pueda tocar estos dos
+  // campos — así no hay forma de que este botón reescriba otros
+  // datos del cliente por error.
+  await updateDoc(doc(db, "clientes", clienteId), { estado: nuevoEstado, fechaActualizacion: serverTimestamp() });
+  await registrarAuditoria({ accion: "cambiar_estado_cliente", modulo: "clientes", detalle: { clienteId, nuevoEstado } });
+}
+
+export async function eliminarCliente({ clienteId }) {
+  // Borrado permanente del registro del cliente. No borra en cascada
+  // sus respuestas/beneficios/consentimientos históricos (quedan con
+  // el clienteId de un cliente que ya no existe) — si se necesita
+  // borrar también ese rastro por una solicitud de baja de datos,
+  // es una operación aparte.
+  await deleteDoc(doc(db, "clientes", clienteId));
+  await registrarAuditoria({ accion: "eliminar_cliente", modulo: "clientes", detalle: { clienteId } });
 }
 
 // ===================================================================
